@@ -58,7 +58,8 @@ def get_model_configs():
         }   
     }
 
-def run_automl(filepath, target_column):
+# only run selected models if specified
+def run_automl(filepath, target_column, selected_models=None):
     # 1. Load Data
     # sep=None allows Pandas to sniff the delimiter (comma, semicolon, etc.) automatically
     # engine='python' is required when using sep=None
@@ -104,6 +105,9 @@ def run_automl(filepath, target_column):
 
     # 4. Iterate Through Models
     for name, config in configs.items():
+        # If the user sent a list, and this model is NOT in that list, skip it.
+        if selected_models is not None and name not in selected_models:
+            continue
         print(f"Training {name}...")
         
         # Create Full Pipeline: Preprocessor + Classifier
