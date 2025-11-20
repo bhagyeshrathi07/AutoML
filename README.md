@@ -170,7 +170,3 @@ The frontend implementation (`Leaderboard.js`) uses a multi-tiered sorting algor
 * [ ] **Docker:** Containerize the application for easy deployment.
 
 ---
-
-## 📝 License
-
-This project is open-source and available for educational purposes.
