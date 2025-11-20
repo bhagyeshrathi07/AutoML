@@ -9,6 +9,7 @@ This application allows users to upload a dataset, automatically preprocesses th
 ## 🌟 Key Features
 
 * **⚡ Multi-Model Pipeline:** Automatically trains Logistic Regression, Random Forest, SVM, KNN, and XGBoost.
+* **☑️ Custom Model Selection:** Users can toggle specific models on/off to skip computationally expensive algorithms (like SVM) on large datasets.
 * **🛠 Automated Preprocessing:** Handles missing values, scales numerical features, and performs One-Hot/Label encoding for categorical data.
 * **🎛 Hyperparameter Tuning:** Uses `RandomizedSearchCV` to find the best parameters for every model dynamically.
 * **🖥 Hardware Profiling:** A custom-built `ResourceMonitor` tracks **Peak RAM (MB)** and **CPU Usage (%)** in real-time during training.
