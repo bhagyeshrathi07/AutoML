@@ -49,18 +49,20 @@ def get_model_configs():
             }
         },
         'XGBoost': {
-            'model': XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+            'model': XGBClassifier(eval_metric='logloss'),
             'params': {
                 'classifier__learning_rate': [0.01, 0.1, 0.2],
                 'classifier__n_estimators': [50, 100, 200],
                 'classifier__max_depth': [3, 5, 7]
             }
-        }
+        }   
     }
 
 def run_automl(filepath, target_column):
     # 1. Load Data
-    df = pd.read_csv(filepath)
+    # sep=None allows Pandas to sniff the delimiter (comma, semicolon, etc.) automatically
+    # engine='python' is required when using sep=None
+    df = pd.read_csv(filepath, sep=None, engine='python')
     X = df.drop(columns=[target_column])
     y = df[target_column]
 
