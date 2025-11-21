@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Papa from 'papaparse'; // <--- IMPORT THIS
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Leaderboard from './Leaderboard';
 
@@ -12,19 +13,18 @@ const AVAILABLE_MODELS = [
 ];
 
 function App() {
-  // 1. Initialize State from LocalStorage
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark';
   });
 
   const [file, setFile] = useState(null);
   const [target, setTarget] = useState('');
+  const [columns, setColumns] = useState([]); // <--- New State for Columns
   const [selectedModels, setSelectedModels] = useState(AVAILABLE_MODELS);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 2. Effect to Apply Theme
   useEffect(() => {
     if (darkMode) {
       document.documentElement.setAttribute('data-bs-theme', 'dark');
@@ -34,6 +34,32 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+
+  // --- NEW FILE HANDLING LOGIC ---
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    setFile(selectedFile);
+    
+    // Reset columns when file changes
+    setColumns([]); 
+
+    if (selectedFile) {
+      // Use PapaParse to read ONLY the header row (very fast)
+      Papa.parse(selectedFile, {
+        header: true,
+        preview: 1, // We only need the first row to get headers
+        complete: (results) => {
+          // 'results.meta.fields' contains the column names
+          if (results.meta && results.meta.fields) {
+            setColumns(results.meta.fields);
+          }
+        },
+        error: (err) => {
+          console.error("Error parsing CSV:", err);
+        }
+      });
+    }
+  };
 
   const handleModelChange = (modelName) => {
     if (selectedModels.includes(modelName)) {
@@ -78,17 +104,15 @@ function App() {
 
   return (
     <div className="container mt-5 mb-5">
-      {/* Header Area */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">🤖 AutoML Model Comparator</h1>
         
-        {/* CUSTOM TOGGLE SWITCH */}
         <div 
           onClick={() => setDarkMode(!darkMode)}
           style={{
             width: '60px',
             height: '30px',
-            backgroundColor: darkMode ? '#6610f2' : '#ccc', // Purple for Dark, Gray for Light
+            backgroundColor: darkMode ? '#6610f2' : '#ccc',
             borderRadius: '30px',
             position: 'relative',
             cursor: 'pointer',
@@ -97,7 +121,6 @@ function App() {
           }}
           title="Toggle Dark Mode"
         >
-          {/* The Moving Knob with Icon */}
           <div 
             style={{
               width: '26px',
@@ -106,8 +129,8 @@ function App() {
               borderRadius: '50%',
               position: 'absolute',
               top: '2px',
-              left: darkMode ? '32px' : '2px', // Moves the circle
-              transition: 'left 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)', // Bouncy effect
+              left: darkMode ? '32px' : '2px',
+              transition: 'left 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -123,19 +146,36 @@ function App() {
       <div className="card p-4 shadow-sm">
         <form onSubmit={handleSubmit}>
           
-          {/* File Upload */}
+          {/* 1. File Upload (Updated to trigger parsing) */}
           <div className="mb-3">
             <label className="form-label fw-bold">1. Upload Dataset (CSV)</label>
-            <input type="file" className="form-control" accept=".csv" onChange={(e) => setFile(e.target.files[0])} />
+            <input 
+              type="file" 
+              className="form-control" 
+              accept=".csv" 
+              onChange={handleFileChange} // <--- Updated Function
+            />
           </div>
           
-          {/* Target Column */}
+          {/* 2. Target Column (Now with Datalist Dropdown) */}
           <div className="mb-3">
             <label className="form-label fw-bold">2. Target Column Name</label>
-            <input type="text" className="form-control" placeholder="e.g., y, species, income" value={target} onChange={(e) => setTarget(e.target.value)} />
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="Select from list or type manually..." 
+              value={target} 
+              onChange={(e) => setTarget(e.target.value)} 
+              list="columnOptions" // <--- Connects to the datalist below
+            />
+            {/* The Dropdown Options */}
+            <datalist id="columnOptions">
+              {columns.map((col, index) => (
+                <option key={index} value={col} />
+              ))}
+            </datalist>
           </div>
 
-          {/* Model Selection Checkboxes */}
           <div className="mb-4">
             <label className="form-label fw-bold">3. Choose Models to Train</label>
             <div className="d-flex flex-wrap gap-3">
