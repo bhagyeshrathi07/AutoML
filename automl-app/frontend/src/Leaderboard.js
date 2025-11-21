@@ -1,172 +1,170 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ConfusionMatrix from './ConfusionMatrix';
 import ROCChart from './ROCChart';
+import RegressionChart from './RegressionChart';
 
-const Leaderboard = ({ results, darkMode }) => {
-  const [sortedResults, setSortedResults] = useState([]);
-  const [sortCriteria, setSortCriteria] = useState('Accuracy');
-
-  // Trigger sort whenever results or criteria change
-  useEffect(() => {
-    if (!results) return;
-    sortModels(sortCriteria);
-  }, [results, sortCriteria]);
-
-  const sortModels = (criteria) => {
-    const sorted = [...results].sort((a, b) => {
-      // SCENARIO 1: Accuracy
-      if (criteria === 'Accuracy') {
-        if (b.Accuracy !== a.Accuracy) return b.Accuracy - a.Accuracy;
-        return a["Training Time (s)"] - b["Training Time (s)"];
-      }
-      // SCENARIO 2: F1 Score
-      if (criteria === 'F1') {
-        if (b["F1 Score"] !== a["F1 Score"]) return b["F1 Score"] - a["F1 Score"];
-        return a["Training Time (s)"] - b["Training Time (s)"];
-      }
-      // SCENARIO 3: Efficiency (CPU)
-      if (criteria === 'CPU') {
-        if (a["Max CPU (%)"] !== b["Max CPU (%)"]) return a["Max CPU (%)"] - b["Max CPU (%)"];
-        return b["F1 Score"] - a["F1 Score"];
-      }
-      // SCENARIO 4: Memory (RAM)
-      if (criteria === 'RAM') {
-        if (a["Max RAM (MB)"] !== b["Max RAM (MB)"]) return a["Max RAM (MB)"] - b["Max RAM (MB)"];
-        return b["F1 Score"] - a["F1 Score"];
-      }
-      // SCENARIO 5: Speed
-      if (criteria === 'Time') {
-        if (a["Training Time (s)"] !== b["Training Time (s)"]) return a["Training Time (s)"] - b["Training Time (s)"];
-        return b["F1 Score"] - a["F1 Score"];
-      }
-      return 0;
-    });
-    setSortedResults(sorted);
-  };
-
+const Leaderboard = ({ results, darkMode, taskId }) => {
   if (!results || results.length === 0) return null;
 
-  const bestModel = sortedResults[0];
+  const taskType = results[0]["Task Type"];
+  const isClassification = taskType === "Classification";
+  
+  // Default sort: Accuracy for Classif, R2 for Reg
+  const [sortKey, setSortKey] = useState(isClassification ? 'Accuracy' : 'R2 Score');
 
-  const getRankBadge = (index) => {
-    if (index === 0) return "🥇";
-    if (index === 1) return "🥈";
-    if (index === 2) return "🥉";
-    return index + 1;
+  // Sorting Logic
+  const sorted = [...results].sort((a, b) => {
+      const valA = a[sortKey] !== undefined ? a[sortKey] : -Infinity;
+      const valB = b[sortKey] !== undefined ? b[sortKey] : -Infinity;
+      
+      // Metrics where LOWER is better (Ascending Sort)
+      if (['RMSE', 'MAE', 'Training Time (s)', 'Max RAM (MB)'].includes(sortKey)) {
+          return valA - valB;
+      }
+      // Metrics where HIGHER is better (Descending Sort)
+      return valB - valA;
+  });
+
+  const bestModel = sorted[0];
+
+  // --- HELPER FOR SORT BUTTONS ---
+  const SortableHeader = ({ label, metricKey }) => {
+      const isActive = sortKey === metricKey;
+      const isAscendingMetric = ['RMSE', 'MAE', 'Training Time (s)', 'Max RAM (MB)'].includes(metricKey);
+      
+      return (
+          <th className={`align-middle ${isActive ? 'table-active border-primary' : ''}`} 
+              style={{ cursor: 'pointer', minWidth: '130px' }}
+              onClick={() => setSortKey(metricKey)}>
+              
+              <div className="d-flex justify-content-between align-items-center">
+                  <span className="fw-bold me-2">{label}</span>
+                  <button className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline-secondary'} border-0 py-0 px-1`}>
+                      {isActive ? (
+                          isAscendingMetric ? '▲' : '▼'
+                      ) : (
+                          <span style={{ opacity: 0.3 }}>⇅</span>
+                      )}
+                  </button>
+              </div>
+          </th>
+      );
   };
 
   return (
-    <div className="mt-4">
-      {/* HEADER & SORTING DROPDOWN */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>🏆 Model Leaderboard</h3>
-        
-        <div className="d-flex align-items-center">
-          <label className="me-2 fw-bold">Prioritize By:</label>
-          <select 
-            className={`form-select w-auto ${darkMode ? 'bg-dark text-white border-secondary' : ''}`}
-            value={sortCriteria} 
-            onChange={(e) => setSortCriteria(e.target.value)}
-          >
-            <option value="Accuracy">Best Accuracy (Default)</option>
-            <option value="F1">Best F1 Score (Balanced)</option>
-            <option value="Time">Fastest Training Time</option>
-            <option value="CPU">Lowest CPU Usage</option>
-            <option value="RAM">Lowest RAM Usage</option>
-          </select>
-        </div>
+    <div className="animate__animated animate__fadeIn">
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <h3 className="m-0">🏆 Leaderboard <span className={`badge ${isClassification ? 'bg-primary' : 'bg-warning text-dark'}`}>{taskType}</span></h3>
+        <small className="text-muted">Click column headers to sort</small>
       </div>
-
-      {/* TABLE SECTION */}
-      <div className="table-responsive">
-        <table className={`table table-bordered shadow-sm ${darkMode ? 'table-dark table-hover' : 'table-striped table-hover'}`}>
-          <thead className={darkMode ? "table-light" : "table-dark"}>
+      
+      {/* TABLE */}
+      <div className="table-responsive shadow-sm rounded">
+        <table className={`table table-bordered align-middle mb-0 ${darkMode ? 'table-dark table-hover' : 'table-striped'}`}>
+          <thead className={darkMode ? 'table-secondary text-dark' : 'table-light'}>
             <tr>
-              <th>Rank</th>
+              <th className="text-center" style={{width: '60px'}}>Rank</th>
               <th>Model</th>
-              <th className={sortCriteria === 'Accuracy' ? "bg-primary text-white" : ""}>Accuracy</th>
-              <th className={sortCriteria === 'F1' ? "bg-primary text-white" : ""}>F1 Score</th>
-              <th className={sortCriteria === 'Time' ? "bg-primary text-white" : ""}>Training Time</th>
-              <th className={sortCriteria === 'RAM' ? "bg-primary text-white" : ""}>Max RAM</th>
-              <th className={sortCriteria === 'CPU' ? "bg-primary text-white" : ""}>Max CPU</th>
+              
+              {/* DYNAMIC SORTABLE HEADERS */}
+              {isClassification ? (
+                  <>
+                    <SortableHeader label="Accuracy" metricKey="Accuracy" />
+                    <SortableHeader label="F1 Score" metricKey="F1 Score" />
+                  </>
+              ) : (
+                  <>
+                    <SortableHeader label="R2 Score" metricKey="R2 Score" />
+                    <SortableHeader label="MAE" metricKey="MAE" />
+                    <SortableHeader label="RMSE" metricKey="RMSE" />
+                  </>
+              )}
+              
+              <SortableHeader label="Time (s)" metricKey="Training Time (s)" />
+              <SortableHeader label="RAM (MB)" metricKey="Max RAM (MB)" />
             </tr>
           </thead>
           <tbody>
-            {sortedResults.map((model, index) => (
-              <tr key={index} className={index === 0 ? (darkMode ? "table-active border-success" : "table-success fw-bold") : ""}>
-                <td className="text-center">{getRankBadge(index)}</td>
-                <td>{model.Model}</td>
-                <td>{(model.Accuracy * 100).toFixed(2)}%</td>
-                <td>{(model["F1 Score"] * 100).toFixed(2)}%</td>
-                <td>{model["Training Time (s)"]} s</td>
-                <td>{model["Max RAM (MB)"]} MB</td>
-                <td>{model["Max CPU (%)"]}%</td>
+            {sorted.map((r, i) => (
+              <tr key={i} className={i === 0 ? 'table-success fw-bold border-2 border-success' : ''}>
+                <td className="text-center h5">{i === 0 ? '🥇' : i + 1}</td>
+                <td>
+                    {r.Model}
+                    {i === 0 && <span className="badge bg-success ms-2">WINNER</span>}
+                </td>
+                
+                {isClassification ? (
+                    <>
+                        <td className={sortKey === 'Accuracy' ? 'fw-bold text-decoration-underline' : ''}>{(r.Accuracy * 100).toFixed(2)}%</td>
+                        <td className={sortKey === 'F1 Score' ? 'fw-bold text-decoration-underline' : ''}>{(r["F1 Score"] * 100).toFixed(2)}%</td>
+                    </>
+                ) : (
+                    <>
+                        <td className={sortKey === 'R2 Score' ? 'fw-bold text-decoration-underline' : ''}>{r["R2 Score"]}</td>
+                        <td className={sortKey === 'MAE' ? 'fw-bold text-decoration-underline' : ''}>{r["MAE"]}</td>
+                        <td className={sortKey === 'RMSE' ? 'fw-bold text-decoration-underline' : ''}>{r["RMSE"]}</td>
+                    </>
+                )}
+                
+                <td className={sortKey === 'Training Time (s)' ? 'fw-bold' : ''}>{r["Training Time (s)"]}</td>
+                <td className={sortKey === 'Max RAM (MB)' ? 'fw-bold' : ''}>{r["Max RAM (MB)"]}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* VISUALIZATION SECTION (Dynamic based on Best Model) */}
-      {bestModel && (
-        <div className={`card mt-4 mb-4 shadow-sm ${darkMode ? 'bg-dark text-white border-secondary' : ''}`}>
-          <div className="card-header fw-bold border-secondary">
-            📊 Visual Analysis: {bestModel.Model}
-          </div>
-          <div className="card-body">
-            <div className="row align-items-center">
-              
-              {/* Left Col: Confusion Matrix (Now smaller: 4/12 columns) */}
-              <div className="col-md-4 border-end border-secondary d-flex justify-content-center">
-                 <ConfusionMatrix data={bestModel.ConfusionMatrix} darkMode={darkMode} />
-              </div>
-
-              {/* Right Col: ROC Curve (Now larger: 8/12 columns) */}
-              <div className="col-md-8">
-                 <ROCChart 
-                    data={bestModel.ROCData} 
-                    auc={bestModel.AUC} 
-                    darkMode={darkMode} 
-                 />
-              </div>
-              
-            </div>
-            <p className="text-left mt-3text-muted small">
-              *Charts update automatically when the sorting criteria changes.
-            </p>
-          </div>
+      {/* DETAIL CARD */}
+      <div className={`card mt-4 shadow border-success ${darkMode ? 'bg-dark text-white' : ''}`}>
+        <div className="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
+            <span>✨ Best Model Details: {bestModel.Model}</span>
+            <span className="badge bg-white text-success">Rank #1</span>
         </div>
-      )}
-
-      {/* RECOMMENDATION & DOWNLOAD CARD */}
-      <div className={`alert mt-3 ${darkMode ? 'alert-dark border-success text-white' : 'alert-success border-success'}`} style={darkMode ? {borderColor: '#198754'} : {}}>
-        <div className="d-flex justify-content-between align-items-center">
-            <div>
-                <h5>
-                    ✨ Recommended for 
-                    {sortCriteria === 'Accuracy' && " Maximum Accuracy"}
-                    {sortCriteria === 'F1' && " Balanced Performance (F1)"}
-                    {sortCriteria === 'Time' && " High Speed"}
-                    {sortCriteria === 'CPU' && " Efficiency"}
-                    : {bestModel?.Model}
-                </h5>
-                <p className="mb-0 small opacity-75">
-                  Best Hyperparameters: <code>{JSON.stringify(bestModel?.["Best Params"])}</code>
-                </p>
+        <div className="card-body">
+            <div className="row">
+                <div className="col-md-8">
+                    <h6 className="text-success">⚙️ Hyperparameters</h6>
+                    <pre className="p-3 rounded border border-secondary" style={{ backgroundColor: darkMode ? '#2c3034' : '#f8f9fa', fontSize: '0.85rem' }}>
+                        {JSON.stringify(bestModel["Best Params"], null, 2)}
+                    </pre>
+                </div>
+                <div className="col-md-4 d-flex flex-column gap-3 justify-content-center">
+                    <h6 className="fw-bold">📥 Export</h6>
+                    <a href={`http://127.0.0.1:5000/download-model?model=${bestModel.Model}`} 
+                       className="btn btn-success w-100 py-2 shadow-sm">
+                       📦 Download Model (.pkl)
+                    </a>
+                    
+                    <a href={`http://127.0.0.1:5000/download-code?model=${bestModel.Model}&task_id=${taskId}`} 
+                       className="btn btn-outline-primary w-100 py-2">
+                       📜 Download Python Code (.py)
+                    </a>
+                </div>
             </div>
-            
-            {/* DYNAMIC DOWNLOAD BUTTON */}
-            <a 
-                href={`http://127.0.0.1:5000/download?model=${bestModel?.Model}`}
-                className="btn btn-success fw-bold shadow-sm"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                ⬇️ Download {bestModel?.Model}
-            </a>
+
+            {/* VISUALIZATIONS */}
+            <div className="row mt-4 pt-4 border-top border-secondary">
+                {isClassification ? (
+                    <>
+                        <div className="col-md-6 text-center">
+                            <h6 className="fw-bold mb-3">Confusion Matrix</h6>
+                            <div className="d-flex justify-content-center">
+                                <ConfusionMatrix data={bestModel.ConfusionMatrix} darkMode={darkMode} />
+                            </div>
+                        </div>
+                        <div className="col-md-6">
+                             <ROCChart data={bestModel.ROCData} auc={bestModel.AUC} darkMode={darkMode} />
+                        </div>
+                    </>
+                ) : (
+                    <div className="col-12">
+                         <RegressionChart data={bestModel.ScatterData} r2={bestModel["R2 Score"]} darkMode={darkMode} />
+                    </div>
+                )}
+            </div>
         </div>
       </div>
-    </div> 
+    </div>
   );
 };
 
