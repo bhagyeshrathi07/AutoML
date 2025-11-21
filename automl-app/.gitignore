@@ -2,6 +2,8 @@
 backend/.venv/
 backend/__pycache__/
 backend/uploads/
+backend/models/
+.idea/
 
 # Node/React
 frontend/node_modules/
