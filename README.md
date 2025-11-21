@@ -168,7 +168,6 @@ The frontend implementation (`Leaderboard.js`) uses a multi-tiered sorting algor
 ## 🔮 Future Roadmap
 
 * [ ] **Regression Support:** Add support for continuous target variables (currently Classification only).
-* [ ] **Model Download:** Button to download the `.pkl` file of the best model.
 * [ ] **Visualizations:** Add Confusion Matrix and ROC-Curve plots.
 * [ ] **Docker:** Containerize the application for easy deployment.
 
