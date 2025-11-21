@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Leaderboard = ({ results, darkMode }) => { // <--- Receive darkMode prop
+const Leaderboard = ({ results, darkMode }) => {
   const [sortedResults, setSortedResults] = useState([]);
   const [sortCriteria, setSortCriteria] = useState('Accuracy');
 
@@ -97,21 +97,36 @@ const Leaderboard = ({ results, darkMode }) => { // <--- Receive darkMode prop
         </table>
       </div>
 
-      {/* Recommendation Card - Adaptive Coloring */}
+      {/* Dynamic Recommendation Card with Download Button */}
       <div className={`alert mt-3 ${darkMode ? 'alert-dark border-success text-white' : 'alert-success border-success'}`} style={darkMode ? {borderColor: '#198754'} : {}}>
-        <h5>
-            ✨ Recommended for 
-            {sortCriteria === 'Accuracy' && " Maximum Accuracy"}
-            {sortCriteria === 'F1' && " Balanced Performance (F1)"}
-            {sortCriteria === 'Time' && " High Speed"}
-            {sortCriteria === 'CPU' && " Efficiency"}
-            : {sortedResults[0]?.Model}
-        </h5>
-        <p className="mb-0 small opacity-75">
-          Best Hyperparameters: <code>{JSON.stringify(sortedResults[0]?.["Best Params"])}</code>
-        </p>
+        <div className="d-flex justify-content-between align-items-center">
+            <div>
+                <h5>
+                    ✨ Recommended for 
+                    {sortCriteria === 'Accuracy' && " Maximum Accuracy"}
+                    {sortCriteria === 'F1' && " Balanced Performance (F1)"}
+                    {sortCriteria === 'Time' && " High Speed"}
+                    {sortCriteria === 'CPU' && " Efficiency"}
+                    : {sortedResults[0]?.Model}
+                </h5>
+                <p className="mb-0 small opacity-75">
+                  Best Hyperparameters: <code>{JSON.stringify(sortedResults[0]?.["Best Params"])}</code>
+                </p>
+            </div>
+            
+            {/* DOWNLOAD BUTTON */}
+            <a 
+                // Dynamically request the model that is currently #1 in the sorted list
+                href={`http://127.0.0.1:5000/download?model=${sortedResults[0]?.Model}`}
+                className="btn btn-success fw-bold shadow-sm"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                ⬇️ Download {sortedResults[0]?.Model}
+            </a>
+        </div>
       </div>
-    </div>
+    </div> 
   );
 };
 
