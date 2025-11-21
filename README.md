@@ -2,19 +2,21 @@
 
 > **A Full-Stack Application for Automated Machine Learning, Hyperparameter Tuning, and Computational Resource Profiling.**
 
-This application allows users to upload a dataset, automatically preprocesses the data, and trains multiple state-of-the-art Machine Learning models in parallel. Uniquely, it creates a **"Resource-Aware Leaderboard"**, ranking models not just by accuracy, but by their computational cost (CPU, RAM, and Training Time), allowing engineers to find the perfect balance between performance and efficiency.
+This application allows users to upload a dataset, automatically preprocesses the data (handling dirty inputs), and trains multiple state-of-the-art Machine Learning models in parallel. 
+
+Uniquely, it creates a **"Resource-Aware Leaderboard"**, ranking models not just by accuracy, but by their computational cost (CPU, RAM, and Training Time). Users can dynamically sort the leaderboard based on their priorities (e.g., Efficiency vs. Accuracy) and **download the specific model** that best fits their needs.
 
 ---
 
 ## 🌟 Key Features
 
-* **⚡ Multi-Model Pipeline:** Automatically trains Logistic Regression, Random Forest, SVM, KNN, and XGBoost.
-* **☑️ Custom Model Selection:** Users can toggle specific models on/off to skip computationally expensive algorithms (like SVM) on large datasets.
-* **🛠 Automated Preprocessing:** Handles missing values, scales numerical features, and performs One-Hot/Label encoding for categorical data.
-* **🎛 Hyperparameter Tuning:** Uses `RandomizedSearchCV` to find the best parameters for every model dynamically.
+* **⚡ Multi-Model Pipeline:** Trains Logistic Regression, Random Forest, SVM, KNN, and XGBoost with automated Hyperparameter Tuning (`RandomizedSearchCV`).
+* **☑️ Selective Training:** Users can toggle specific models on/off to skip computationally expensive algorithms (like SVM) on large datasets.
+* **🧹 Smart Data Cleaning:** Automatically detects and drops irrelevant columns (e.g., `id`, `ID`) and cleans "dirty" CSVs with trailing commas or empty columns.
+* **🌗 Dark/Light Mode:** Fully responsive UI with a persistent Dark Mode toggle for comfortable viewing.
 * **🖥 Hardware Profiling:** A custom-built `ResourceMonitor` tracks **Peak RAM (MB)** and **CPU Usage (%)** in real-time during training.
-* **📊 Interactive Leaderboard:** A React-based UI that allows sorting by **Accuracy**, **F1-Score**, **Speed**, or **Efficiency** (low resource usage).
-* **🧠 Dynamic Recommendations:** Automatically suggests the best model based on the user's priority (e.g., "I need the fastest model" vs "I need the most accurate model").
+* **📊 Interactive Leaderboard:** Sort results by **Accuracy**, **F1-Score**, **Speed**, or **Efficiency**. The "Recommended Model" updates dynamically based on your sorting criteria.
+* **💾 Dynamic Model Download:** Save and download the specific model that currently tops the leaderboard (e.g., if you sort by "Lowest CPU", the download button provides the most efficient model).
 
 ---
 
