@@ -21,25 +21,30 @@ from xgboost import XGBClassifier
 from monitor import ResourceMonitor
 
 def get_model_configs():
-    """Defines all models and their hyperparameter grids."""
+    """
+    Defines all models. 
+    We add class_weight='balanced' to force models to pay attention to minority classes (e.g. Fraud).
+    """
     return {
         'Logistic Regression': {
-            'model': LogisticRegression(solver='liblinear'),
+            # class_weight='balanced' automatically adjusts weights inversely proportional to class frequencies
+            'model': LogisticRegression(solver='liblinear', class_weight='balanced'),
             'params': {
                 'classifier__C': [0.1, 1, 10],
                 'classifier__penalty': ['l1', 'l2']
             }
         },
         'Random Forest': {
-            'model': RandomForestClassifier(),
+            'model': RandomForestClassifier(class_weight='balanced'),
             'params': {
                 'classifier__n_estimators': [50, 100, 200],
                 'classifier__max_depth': [None, 10, 20],
-                'classifier__min_samples_split': [2, 5]
+                'classifier__min_samples_split': [2, 5],
+                'classifier__criterion': ['gini', 'entropy']
             }
         },
         'SVM': {
-            'model': SVC(probability=True),
+            'model': SVC(probability=True, class_weight='balanced'),
             'params': {
                 'classifier__C': [0.1, 1, 10],
                 'classifier__kernel': ['linear', 'rbf']
@@ -53,6 +58,7 @@ def get_model_configs():
             }
         },
         'XGBoost': {
+            # XGBoost handles weights differently (scale_pos_weight), handled dynamically in the loop
             'model': XGBClassifier(eval_metric='logloss'),
             'params': {
                 'classifier__learning_rate': [0.01, 0.1, 0.2],
@@ -63,32 +69,60 @@ def get_model_configs():
     }
 
 def run_automl(filepath, target_column, selected_models=None):
-    # 1. Load Data (Smart Parsing)
+    # 1. Load Data
     df = pd.read_csv(filepath, sep=None, engine='python')
     
-    # --- ROBUST CLEANING LOGIC ---
-    # A. Drop 'id' columns (case-insensitive) to prevent cheating/overfitting
-    if 'id' in df.columns.str.lower():
-        col_to_drop = df.columns[df.columns.str.lower() == 'id'][0]
-        df = df.drop(columns=[col_to_drop])
-        print(f"Dropped ID column: {col_to_drop}")
+    # --- CLEANING ---
+    for col in df.columns:
+        if 'id' in col.lower().split('_') or col.lower() == 'id':
+             df = df.drop(columns=[col])
+             print(f"🗑 Dropped ID column: {col}")
 
-    # B. Drop 'Unnamed' columns (common in Kaggle datasets)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-    # C. Drop columns that are completely empty (All NaN)
     df = df.dropna(axis=1, how='all')
-    # -----------------------------
+    
+    # Handle strings
+    for col in list(df.select_dtypes(include=['object']).columns):
+        if col == target_column: continue
+        
+        numeric_conversion = pd.to_numeric(df[col], errors='coerce')
+        if numeric_conversion.notna().mean() > 0.8:
+            df[col] = numeric_conversion
+            continue
+
+        try:
+            pd.to_datetime(df[col], errors='raise')
+            df = df.drop(columns=[col])
+            continue
+        except:
+            pass
+
+        if df[col].nunique() > 50 and (df[col].nunique() / len(df)) > 0.05:
+            df = df.drop(columns=[col])
+            print(f"💣 Dropped High-Cardinality column: {col}")
+    # ----------------
+
+    # --- NEW: STRATIFIED SAMPLING ---
+    MAX_ROWS = 100000 
+    
+    if MAX_ROWS and len(df) > MAX_ROWS:
+        print(f"⚠️ Dataset is huge ({len(df)} rows). Sampling down to {MAX_ROWS} (Stratified).")
+        try:
+            # Stratify ensures we keep the EXACT SAME ratio of Fraud vs Non-Fraud
+            df, _ = train_test_split(df, train_size=MAX_ROWS, stratify=df[target_column], random_state=42)
+        except:
+            # Fallback to random if stratification fails (e.g. extremely rare classes)
+            df = df.sample(n=MAX_ROWS, random_state=42)
+    # --------------------------------
 
     X = df.drop(columns=[target_column])
     y = df[target_column]
 
-    # If the target is categorical (strings), encode it to integers (0, 1, 2...)
     if y.dtype == 'object' or isinstance(y.iloc[0], str):
         le = LabelEncoder()
         y = le.fit_transform(y)
 
-    # 2. Preprocessing Setup
+    # 2. Preprocessing
     num_cols = X.select_dtypes(include=['int64', 'float64']).columns
     cat_cols = X.select_dtypes(include=['object', 'category']).columns
 
@@ -109,18 +143,23 @@ def run_automl(filepath, target_column, selected_models=None):
         ]
     )
 
-    # 3. Split Data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
     results = []
     configs = get_model_configs()
-    
-    # Dictionary to temporarily hold the actual trained model objects
     trained_models = {} 
+
+    # Calculate imbalance ratio for XGBoost
+    # (Negatives / Positives)
+    scale_pos_weight = 1
+    if len(np.unique(y)) == 2:
+        negatives = np.sum(y_train == 0)
+        positives = np.sum(y_train == 1)
+        if positives > 0:
+            scale_pos_weight = negatives / positives
 
     # 4. Iterate Through Models
     for name, config in configs.items():
-        # Skip model if not selected by user
         if selected_models is not None and name not in selected_models:
             continue
 
@@ -129,46 +168,42 @@ def run_automl(filepath, target_column, selected_models=None):
         clf = Pipeline(steps=[('preprocessor', preprocessor),
                               ('classifier', config['model'])])
         
+        # DYNAMIC WEIGHT FOR XGBOOST
+        if name == 'XGBoost' and len(np.unique(y)) == 2:
+            clf.set_params(classifier__scale_pos_weight=scale_pos_weight)
+            print(f"   -> Applied XGBoost scale_pos_weight: {round(scale_pos_weight, 2)}")
+
         start_time = time.time()
         monitor = ResourceMonitor()
         
         with monitor:
-            # Faster search settings (iter=2, cv=2) for responsiveness
-            search = RandomizedSearchCV(clf, config['params'], n_iter=2, cv=3, n_jobs=-1, random_state=42)
+            search = RandomizedSearchCV(clf, config['params'], n_iter=2, cv=2, n_jobs=-1, random_state=42)
             search.fit(X_train, y_train)
         
         duration = round(time.time() - start_time, 2)
         best_model = search.best_estimator_
-        
-        # Store the trained model object for saving later
         trained_models[name] = best_model 
 
         y_pred = best_model.predict(X_test)
         
-        # 1. Confusion Matrix
         cm = confusion_matrix(y_test, y_pred)
-        cm_data = cm.tolist() # Convert to list for JSON serialization
+        cm_data = cm.tolist() 
 
-        # 2. ROC Curve Data & AUC (Only for binary classification)
         roc_data = []
         roc_auc_score = 0
         
-        if len(np.unique(y)) == 2:  # Check if binary
+        if len(np.unique(y)) == 2:
             try:
                 y_prob = best_model.predict_proba(X_test)[:, 1]
                 fpr, tpr, _ = roc_curve(y_test, y_prob)
                 roc_auc_score = auc(fpr, tpr)
                 
-                # --- ROC Visual Fix ---
-                # If the curve is perfect (very few points), keep ALL of them.
-                # Otherwise, downsample to save bandwidth.
                 if len(fpr) < 20:
                     for i in range(len(fpr)):
                         roc_data.append({"x": round(fpr[i], 3), "y": round(tpr[i], 3)})
                 else:
                     for i in range(0, len(fpr), 5): 
                         roc_data.append({"x": round(fpr[i], 3), "y": round(tpr[i], 3)})
-                    # Always append the last point
                     roc_data.append({"x": round(fpr[-1], 3), "y": round(tpr[-1], 3)})
             except:
                 roc_data = None
@@ -189,22 +224,17 @@ def run_automl(filepath, target_column, selected_models=None):
         }
         results.append(metrics)
 
-    # Sort results by Accuracy (Desc) then Time (Asc)
     results.sort(key=lambda x: (x['Accuracy'], -x['Training Time (s)']), reverse=True)
 
-    # --- SAVE ALL TRAINED MODELS ---
-    # Get absolute path to ensure it works regardless of where python is run
+    # Save Models
     base_dir = os.path.dirname(os.path.abspath(__file__))
     models_dir = os.path.join(base_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
 
     for name, model in trained_models.items():
-        # Clean the name (e.g., "Logistic Regression" -> "Logistic_Regression.pkl")
         safe_name = name.replace(" ", "_") + ".pkl"
         save_path = os.path.join(models_dir, safe_name)
-        
         joblib.dump(model, save_path)
         print(f"Saved {name} to {save_path}")
-    # -------------------------------
 
     return results

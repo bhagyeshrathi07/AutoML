@@ -11,6 +11,8 @@ Uniquely, it creates a **"Resource-Aware Leaderboard"**, ranking models not just
 ## 🌟 Key Features
 
 * **⚡ Multi-Model Pipeline:** Trains Logistic Regression, Random Forest, SVM, KNN, and XGBoost with automated Hyperparameter Tuning (`RandomizedSearchCV`).
+* **⚖️ Imbalance Handling:** Uses **Stratified Sampling** and **Class Weights** (`balanced`, `scale_pos_weight`) to ensure minority classes (e.g., Fraud) are detected accurately even in large, imbalanced datasets.
+* **📊 Dataset Statistics:** Instantly displays row count, column count, and file size upon upload to help users understand their data.
 * **📈 Dynamic Visualizations:** Interactive **ROC Curves** and **Confusion Matrices** that update instantly based on the currently selected "Best Model".
 * **🔍 Column Auto-Detection:** Frontend uses `PapaParse` to scan CSV headers immediately, providing a **dropdown list** of columns for the target variable.
 * **☑️ Selective Training:** Users can toggle specific models on/off to skip computationally expensive algorithms (like SVM) on large datasets.
@@ -31,7 +33,7 @@ graph TD
     API --> Pipeline[ML Pipeline]
     
     subgraph Backend
-        Pipeline --> Cleaner[Smart Cleaner]
+        Pipeline --> Cleaner[Smart Cleaner & Stratified Sampler]
         Cleaner --> Pre[Preprocessing & Scaling]
         Pre --> Tuning[Hyperparameter Tuning]
         Tuning --> Monitor[Resource Monitor Thread]
@@ -48,19 +50,19 @@ graph TD
 ## 🛠 Tech Stack
 
 ### **Backend (Python)**
-* **Flask:** API Server.
-* **Scikit-Learn:** Model training and preprocessing pipelines.
+* **Flask:** API Server & File Serving.
+* **Scikit-Learn:** Model training, pipelines, and preprocessing.
 * **XGBoost:** Gradient boosting implementation.
-* **Pandas & NumPy:** Data manipulation.
+* **Joblib:** Model serialization (.pkl) and parallel processing.
 * **Psutil:** System resource monitoring (RAM/CPU).
-* **Joblib:** Parallel processing.
+* **Pandas:** Data manipulation and smart CSV parsing.
 
 ### **Frontend (React)**
 * **React.js:** Component-based UI.
 * **Recharts:** Responsive, dynamic charting for ROC curves.
 * **PapaParse:** Client-side CSV header parsing.
 * **Axios:** HTTP Client.
-* **Bootstrap 5:** Responsive styling and layout.
+* **Bootstrap 5:** Styling, Dark Mode theme, and responsive layout.
 
 ---
 
@@ -119,15 +121,17 @@ npm start
 *App will open at `http://localhost:3000`*
 
 ### 3. Run the Pipeline
-1.  **Upload Data:** Select a clean CSV file (e.g., Iris, Titanic, Breast Cancer).
-2.  **Target Column:** Select the target column from the dropdown list (auto-detected) or type it manually.
-3.  **Select Models:** Use the checkboxes to choose which models to run.
-4.  **Launch:** Click "Launch Pipeline".
+1.  **Upload Data:** Select a clean CSV file (e.g., `breast-cancer.csv`, `bank-full.csv`).
+2.  **Review Stats:** Check the file size and row count displayed below the upload box.
+3.  **Target Column:** Select the target column from the dropdown list (auto-detected) or type it manually.
+4.  **Select Models:** Use the checkboxes to choose which models to run.
+5.  **Launch:** Click "Launch Pipeline".
 
 ### 4. Analyze and Download
-1. **Sort:** Use the dropdown to prioritize Accuracy, F1 Score, Time, or CPU.
-2. **Visual Analysis:** Scroll down to see the Confusion Matrix and ROC Curve for the winning model.
-3. **Download:** Click the "⬇️ Download [Model Name]" button to get the serialized `.pkl` file for the current winner.
+1.  **Sort:** Use the dropdown to prioritize Accuracy, F1 Score, Time, or CPU.
+2.  **Visual Analysis:** Scroll down to see the Confusion Matrix and ROC Curve for the winning model.
+3.  **Download:** Click the "⬇️ Download [Model Name]" button to get the serialized `.pkl` file for the current winner.
+
 ---
 
 ## 📂 Project Structure
@@ -145,7 +149,7 @@ automl-app/
 │
 ├── frontend/                # React Client
 │   ├── src/
-│   │   ├── App.js           # Main UI (Upload, Dark Mode, Checkboxes)
+│   │   ├── App.js           # Main UI (Upload, Stats, Dark Mode, Checkboxes)
 │   │   ├── Leaderboard.js   # Results Table & Dynamic Download
 │   │   ├── ROCChart.js      # Recharts Visualization
 │   │   ├── ConfusionMatrix.js # Grid Visualization
@@ -163,14 +167,6 @@ automl-app/
 ### The Resource Monitor
 Standard ML libraries do not report hardware usage. This project uses a custom Context Manager (`backend/monitor.py`) that spawns a background thread alongside the model training to snapshot system stats.
 
-### Dynamic Visualizations
-
-The backend calculates the Confusion Matrix and ROC Curve points for every trained model and sends this raw data to the frontend. The React frontend renders these using `Recharts`. When a user changes the sorting criteria (e.g., prioritizes "Lowest CPU"), the charts instantly redraw to reflect the performance of the new "Best Model."
-
-### Dynamic Model Saving
-
-When the pipeline runs, it serializes every trained model into the `backend/models/` directory using `joblib`. This allows the frontend to request a specific model file based on the user's sorting preference.
-
 ```python
 # Example logic
 with ResourceMonitor() as monitor:
@@ -178,10 +174,16 @@ with ResourceMonitor() as monitor:
 print(monitor.max_ram) # Reports peak memory usage
 ```
 
-### The Sorting Logic (Smart Sort)
-The frontend implementation (`Leaderboard.js`) uses a multi-tiered sorting algorithm:
-* **Accuracy Mode:** Sorts by Accuracy (Desc) -> Tie-breaker: Time (Asc).
-* **Efficiency Mode:** Sorts by CPU (Asc) -> Tie-breaker: F1 Score (Desc).
+### Big Data & Imbalance Safety
+* **Sampling:** If the dataset is larger than 100,000 rows, it automatically downsamples it to keep the app responsive.
+* **Stratification:** It uses **Stratified Sampling** to ensure the ratio of minority classes (e.g., Fraud) remains intact even after downsampling.
+* **Class Weights:** Models are configured with `class_weight='balanced'` (and dynamic `scale_pos_weight` for XGBoost) to penalize missing rare cases.
+
+### Dynamic Visualizations
+The backend calculates the **Confusion Matrix** and **ROC Curve points** for every trained model and sends this raw data to the frontend. The React frontend renders these using `Recharts`. When a user changes the sorting criteria (e.g., prioritizes "Lowest CPU"), the charts instantly redraw to reflect the performance of the new "Best Model."
+
+### Dynamic Model Saving
+When the pipeline runs, it serializes **every** trained model into the `backend/models/` directory using `joblib`. This allows the frontend to request a specific model file based on the user's sorting preference.
 
 ---
 
