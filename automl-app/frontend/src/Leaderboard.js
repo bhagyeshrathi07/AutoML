@@ -84,6 +84,7 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
               </>
             )}
             <option value="Training Time (s)">Time (Fastest)</option>
+            <option value="Max RAM (MB)">RAM (Efficiency)</option> {/* ADDED THIS LINE */}
             <option value="Max CPU (%)">CPU (Efficiency)</option>
           </select>
         </div>
@@ -139,7 +140,7 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
                 )}
 
                 <td>{r["Training Time (s)"]}</td>
-                <td>{r["Max RAM (MB)"]}</td>
+                <td className={sortKey === 'Max RAM (MB)' ? 'fw-bold text-decoration-underline' : ''}>{r["Max RAM (MB)"]}</td>
                 <td>{r["Max CPU (%)"]}</td>
               </tr>
             ))}
