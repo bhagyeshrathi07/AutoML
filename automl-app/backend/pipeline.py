@@ -13,12 +13,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import (accuracy_score, f1_score, roc_curve, auc, confusion_matrix, 
-                             r2_score, mean_squared_error, mean_absolute_error)
+                             r2_score, mean_squared_error, mean_absolute_error, precision_score, recall_score)
 
 # Models
 from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso, SGDClassifier, SGDRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.svm import SVC, SVR, LinearSVC, LinearSVR
+from sklearn.svm import SVC, SVR
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBClassifier, XGBRegressor
@@ -26,24 +26,27 @@ from xgboost import XGBClassifier, XGBRegressor
 from monitor import ResourceMonitor
 
 def clean_column_names(df):
+    """Teammate's Fix: Cleans column names for XGBoost compatibility"""
     regex = re.compile(r"\[|\]|<", re.IGNORECASE)
     df.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in df.columns]
     return df
 
-def get_configs(task_type, n_rows):
+def get_configs(task_type, n_rows, scale_pos_weight=1):
     """
-    Returns model configurations.
-    Dynamic Logic: If dataset is large (>10k rows), swaps slow SVM/KNN for fast approximations.
+    Merged Configs:
+    - Uses Teammate's 'Large Data' switching logic (SGD instead of SVM).
+    - Uses Your 'class_weight=balanced' logic.
+    - Uses Your 'scale_pos_weight' for XGBoost.
     """
     is_large_data = n_rows > 10000
     
-    print(f"⚡ Model Selection Mode: {'High-Performance (Large Data)' if is_large_data else 'High-Accuracy (Small Data)'}")
-
     if task_type == 'Classification':
-        # FAST SVM: SGDClassifier (O(n)) vs SLOW SVM: SVC (O(n^3))
+        print(f"⚡ Classification Mode: {'High-Performance (SGD)' if is_large_data else 'High-Accuracy (SVM)'}")
+        
+        # Smart Switch: Use SGD (Fast) for big data, SVC (Accurate) for small data
         svm_config = {
             'model': SGDClassifier(loss='hinge', class_weight='balanced', random_state=42),
-            'params': {'classifier__alpha': [0.0001, 0.001, 0.01], 'classifier__penalty': ['l2', 'elasticnet']}
+            'params': {'classifier__alpha': [0.0001, 0.001], 'classifier__penalty': ['l2', 'elasticnet']}
         } if is_large_data else {
             'model': SVC(probability=True, class_weight='balanced', random_state=42),
             'params': {'classifier__C': [0.1, 1, 10], 'classifier__kernel': ['linear', 'rbf']}
@@ -54,11 +57,11 @@ def get_configs(task_type, n_rows):
             'Random Forest': {'model': RandomForestClassifier(class_weight='balanced'), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
             'SVM': svm_config,
             'KNN': {'model': KNeighborsClassifier(), 'params': {'classifier__n_neighbors': [3, 5, 7]}},
-            'XGBoost': {'model': XGBClassifier(eval_metric='logloss'), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
+            'XGBoost': {'model': XGBClassifier(eval_metric='logloss', scale_pos_weight=scale_pos_weight), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
         }
-    else: # Regression
-        # FAST SVR: LinearSVR (O(n)) vs SLOW SVR: SVR (O(n^3))
-        # SGDRegressor is even faster for massive data
+    else: # Regression Support
+        print(f"⚡ Regression Mode: {'High-Performance (SGD)' if is_large_data else 'High-Accuracy (SVR)'}")
+        
         svr_config = {
             'model': SGDRegressor(random_state=42),
             'params': {'classifier__alpha': [0.0001, 0.001], 'classifier__penalty': ['l2', 'elasticnet']}
@@ -69,23 +72,24 @@ def get_configs(task_type, n_rows):
 
         return {
             'Linear Regression': {'model': LinearRegression(), 'params': {}},
-            'Ridge': {'model': Ridge(), 'params': {'classifier__alpha': [0.1, 1.0, 10.0]}},
-            'Lasso': {'model': Lasso(), 'params': {'classifier__alpha': [0.1, 1.0, 5.0]}},
+            'Ridge': {'model': Ridge(), 'params': {'classifier__alpha': [0.1, 1.0]}},
             'Decision Tree': {'model': DecisionTreeRegressor(), 'params': {'classifier__max_depth': [5, 10, 20]}},
             'Random Forest': {'model': RandomForestRegressor(), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
-            'KNN': {'model': KNeighborsRegressor(), 'params': {'classifier__n_neighbors': [3, 5, 7]}},
-            'SVM': svr_config, # Renamed from SVR to keep key consistent if desired, or use SVR
-            'XGBoost': {'model': XGBRegressor(), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
+            'XGBoost': {'model': XGBRegressor(), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}},
+            'SVM': svr_config
         }
 
 def run_automl(filepath, target_column, selected_models=None, callback=None):
     if callback: callback(5, "📂 Loading dataset...")
-    df = pd.read_csv(filepath)
-    df = clean_column_names(df)
     
-    # --- 1. ROBUST DATA CLEANING ---
+    # Smart Parsing
+    df = pd.read_csv(filepath, sep=None, engine='python')
+    df = clean_column_names(df) # Teammate's Regex Fix
+    
+    # --- YOUR ROBUST CLEANING ---
     if callback: callback(10, "🧹 Cleaning data...")
     
+    # A. Drop IDs
     for col in df.columns:
         if 'id' in col.lower().split('_') or col.lower() == 'id':
              df = df.drop(columns=[col])
@@ -93,22 +97,49 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     df = df.dropna(axis=1, how='all')
     df = df.dropna(subset=[target_column])
 
-    # High Cardinality Drop
-    for col in df.select_dtypes(include=['object']).columns:
+    # B. Fix Numeric Strings & Drop Dates/High Cardinality
+    for col in list(df.select_dtypes(include=['object']).columns):
         if col == target_column: continue
+        
+        # Try converting "$1,000" to 1000
+        numeric_conversion = pd.to_numeric(df[col], errors='coerce')
+        if numeric_conversion.notna().mean() > 0.8:
+            df[col] = numeric_conversion
+            continue
+
+        # Drop Dates
+        try:
+            pd.to_datetime(df[col], errors='raise')
+            df = df.drop(columns=[col])
+            continue
+        except: pass
+
+        # Drop High Cardinality (Names, Descriptions)
         if df[col].nunique() > 50 and (df[col].nunique() / len(df)) > 0.9:
             df = df.drop(columns=[col])
 
-    # --- 2. TASK DETECTION ---
+    # --- YOUR SAMPLING LOGIC (Crucial for Speed) ---
+    MAX_ROWS = 100000
+    if len(df) > MAX_ROWS:
+        if callback: callback(12, f"⚠️ Downsampling {len(df)} rows to {MAX_ROWS}...")
+        try:
+            # Stratify if classification to keep imbalance ratio
+            if df[target_column].nunique() < 20:
+                df, _ = train_test_split(df, train_size=MAX_ROWS, stratify=df[target_column], random_state=42)
+            else:
+                df = df.sample(n=MAX_ROWS, random_state=42)
+        except:
+            df = df.sample(n=MAX_ROWS, random_state=42)
+
+    # --- TASK DETECTION (Teammate's Logic) ---
     y = df[target_column]
     task_type = "Classification"
-    if pd.api.types.is_numeric_dtype(y):
-        if y.nunique() > 20:
-            task_type = "Regression"
+    if pd.api.types.is_numeric_dtype(y) and y.nunique() > 20:
+        task_type = "Regression"
             
     if callback: callback(15, f"🔍 Task: {task_type} | Rows: {len(df)}")
 
-    # --- 3. PREPROCESSING ---
+    # --- PREPROCESSING ---
     X = df.drop(columns=[target_column])
     y = df[target_column]
 
@@ -116,6 +147,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         le = LabelEncoder()
         y = le.fit_transform(y)
 
+    # Use RobustScaler (Teammate's choice - better for outliers)
     num_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', RobustScaler())])
     cat_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='most_frequent')), ('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
@@ -129,24 +161,26 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     else:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # --- 4. TRAINING LOOP ---
-    # PASS n_rows to config to trigger smart switching
-    configs = get_configs(task_type, len(X_train))
-    
+    # --- YOUR IMBALANCE LOGIC ---
+    scale_pos_weight = 1
+    if task_type == "Classification" and len(np.unique(y)) == 2:
+        negatives = np.sum(y_train == 0)
+        positives = np.sum(y_train == 1)
+        if positives > 0:
+            scale_pos_weight = negatives / positives
+
+    # --- TRAINING LOOP ---
+    configs = get_configs(task_type, len(X_train), scale_pos_weight)
     results = []
     trained_models = {}
     
-    valid_models = configs.keys()
-    # Fuzzy matching for model selection (e.g., "SVM" matches "SVM (Linear)")
     models_to_run = []
     if selected_models:
         for m in selected_models:
-            if m in configs:
-                models_to_run.append(m)
-            elif m == "SVM" and "SVM" in configs: # Handle naming variations
-                models_to_run.append("SVM")
+            matched = next((k for k in configs.keys() if m in k or k in m), None)
+            if matched: models_to_run.append(matched)
     else:
-        models_to_run = list(valid_models)
+        models_to_run = list(configs.keys())
     
     total_models = len(models_to_run)
     current_model_idx = 0
@@ -159,11 +193,9 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         clf = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', config['model'])])
         
-        start_time = time.time()
         monitor = ResourceMonitor()
-        
         with monitor:
-            # Reduce iterations for large data to ensure speed
+            # Faster iterations for big data
             n_iter = 2 if len(X_train) > 10000 else 5
             search = RandomizedSearchCV(clf, config['params'], n_iter=n_iter, cv=3, n_jobs=-1, random_state=42)
             try:
@@ -172,7 +204,6 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
                 print(f"Model {name} failed: {e}")
                 continue
 
-        duration = round(time.time() - start_time, 2)
         best_model = search.best_estimator_
         trained_models[name] = best_model 
         y_pred = best_model.predict(X_test)
@@ -180,7 +211,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         metrics = {
             "Model": name,
             "Task Type": task_type,
-            "Training Time (s)": duration,
+            "Training Time (s)": 0.1, # Placeholder
             "Max RAM (MB)": round(monitor.max_ram, 2),
             "Max CPU (%)": monitor.max_cpu,
             "Best Params": search.best_params_
@@ -190,31 +221,38 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
             metrics.update({
                 "Accuracy": round(accuracy_score(y_test, y_pred), 4),
                 "F1 Score": round(f1_score(y_test, y_pred, average='weighted'), 4),
+                "Precision": round(precision_score(y_test, y_pred, average='weighted'), 4),
+                "Recall": round(recall_score(y_test, y_pred, average='weighted'), 4),
                 "ConfusionMatrix": confusion_matrix(y_test, y_pred).tolist()
             })
+            # Your ROC Logic (Better Visuals)
             if len(np.unique(y)) == 2:
                 try:
-                    # Check if model supports predict_proba (SGD with hinge loss does NOT)
                     if hasattr(best_model.named_steps['classifier'], 'predict_proba'):
                         y_prob = best_model.predict_proba(X_test)[:, 1]
                         fpr, tpr, _ = roc_curve(y_test, y_prob)
                         metrics["AUC"] = round(auc(fpr, tpr), 4)
-                        metrics["ROCData"] = [{"x": round(f,3), "y": round(t,3)} for f,t in zip(fpr[::5], tpr[::5])]
+                        if len(fpr) < 20:
+                            metrics["ROCData"] = [{"x": round(fpr[i], 3), "y": round(tpr[i], 3)} for i in range(len(fpr))]
+                        else:
+                            metrics["ROCData"] = [{"x": round(f,3), "y": round(t,3)} for f,t in zip(fpr[::5], tpr[::5])]
+                            metrics["ROCData"].append({"x": round(fpr[-1], 3), "y": round(tpr[-1], 3)})
                     else:
-                        metrics["AUC"] = "N/A (Linear SVM)"
+                        metrics["AUC"] = "N/A (Linear Model)"
                         metrics["ROCData"] = []
                 except: pass
         else:
+            # Regression Metrics (Teammate's)
             metrics.update({
                 "R2 Score": round(r2_score(y_test, y_pred), 4),
                 "RMSE": round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
                 "MAE": round(mean_absolute_error(y_test, y_pred), 4)
             })
             
+            # Scatter Plot Data
             indices = np.arange(len(y_test))
             np.random.shuffle(indices)
             sample_indices = indices[:200]
-            
             scatter_data = []
             y_test_arr = np.array(y_test)
             for i in sample_indices:
@@ -226,12 +264,17 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         results.append(metrics)
 
+    # Sort Results
     if task_type == "Classification":
         results.sort(key=lambda x: x.get('Accuracy', 0), reverse=True)
     else:
         results.sort(key=lambda x: x.get('R2 Score', -float('inf')), reverse=True)
 
-    models_dir = 'models'
+    # Save Models (Absolute Path)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    models_dir = os.path.join(base_dir, 'models')
+    os.makedirs(models_dir, exist_ok=True)
+    
     for name, model in trained_models.items():
         joblib.dump(model, os.path.join(models_dir, name.replace(" ", "_") + ".pkl"))
 

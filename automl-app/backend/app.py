@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 
+# Import custom modules
 from pipeline import run_automl
 from codegen import generate_training_script
 
@@ -19,7 +20,10 @@ MODELS_FOLDER = 'models'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(MODELS_FOLDER, exist_ok=True)
 
-# Thread Executor (Prevents blocking)
+# Increase Upload Limit for Big CSVs (100MB)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024 
+
+# Thread Executor (Prevents blocking main thread)
 executor = ThreadPoolExecutor(max_workers=2)
 # In-memory storage for running tasks
 tasks = {}
@@ -27,9 +31,11 @@ tasks = {}
 # --- CLEANUP ON STARTUP ---
 # Delete old files so the server starts fresh
 for f in glob.glob(os.path.join(MODELS_FOLDER, "*.pkl")):
-    os.remove(f)
+    try: os.remove(f)
+    except: pass
 for f in glob.glob(os.path.join(UPLOAD_FOLDER, "*.csv")):
-    os.remove(f)
+    try: os.remove(f)
+    except: pass
 print("🧹 Server Cleaned: Old temp files removed.")
 
 # --- BACKGROUND WORKER ---
@@ -38,8 +44,9 @@ def background_task(task_id, filepath, target, selected_models):
     try:
         def update_progress(progress, message):
             # Callback to update global task state
-            tasks[task_id]['progress'] = progress
-            tasks[task_id]['logs'].append(message)
+            if task_id in tasks:
+                tasks[task_id]['progress'] = progress
+                tasks[task_id]['logs'].append(message)
 
         # Run the heavy ML logic
         results = run_automl(filepath, target, selected_models, callback=update_progress)
@@ -60,10 +67,12 @@ def background_task(task_id, filepath, target, selected_models):
     finally:
         # AUTO-DESTRUCT: Remove the user's CSV for privacy & space
         if os.path.exists(filepath):
-            os.remove(filepath)
+            try: os.remove(filepath)
+            except: pass
             print(f"🗑️ Deleted temp file: {filepath}")
 
 # --- ROUTES ---
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -81,7 +90,7 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    # Save file temporarily
+    # Save file temporarily with unique ID
     filename = f"{uuid.uuid4()}_{file.filename}"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
@@ -108,7 +117,7 @@ def get_status(task_id):
         return jsonify({"error": "Task not found"}), 404
     return jsonify(task)
 
-@app.route('/download-model', methods=['GET'])
+@app.route('/download', methods=['GET'])
 def download_model():
     """Downloads the .pkl file"""
     model_name = request.args.get('model')
@@ -116,10 +125,13 @@ def download_model():
         return jsonify({"error": "Model name required"}), 400
 
     filename = model_name.replace(" ", "_") + ".pkl"
-    path = os.path.join(os.path.abspath(MODELS_FOLDER), filename)
+    
+    # CRITICAL FIX: Absolute Path to prevent 'File Not Found'
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_dir, MODELS_FOLDER, filename)
     
     if not os.path.exists(path):
-        return jsonify({"error": "Model file not found"}), 404
+        return jsonify({"error": f"Model file not found: {filename}"}), 404
 
     return send_file(path, as_attachment=True)
 
@@ -133,7 +145,7 @@ def download_code():
         return jsonify({"error": "Missing parameters"}), 400
 
     task = tasks.get(task_id)
-    if not task or not task['results']:
+    if not task or not task.get('results'):
         return jsonify({"error": "Task results not found"}), 404
 
     # Find the model configuration in the results
@@ -147,7 +159,7 @@ def download_code():
         model_name,
         model_data.get("Best Params", {}),
         model_data.get("Task Type", "Classification"),
-        "target_column"
+        "target_column" # Placeholder name
     )
 
     return Response(

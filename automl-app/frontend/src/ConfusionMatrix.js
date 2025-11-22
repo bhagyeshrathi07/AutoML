@@ -1,7 +1,14 @@
 import React from 'react';
 
 const ConfusionMatrix = ({ data, darkMode }) => {
-  if (!data) return <p>No Matrix Data</p>;
+  // If no data (e.g. Regression model), don't render anything or render a fallback
+  if (!data || !Array.isArray(data)) {
+    return (
+      <div className="d-flex align-items-center justify-content-center h-100 text-muted">
+        <small>Not applicable for Regression</small>
+      </div>
+    );
+  }
 
   // data structure: [[TN, FP], [FN, TP]]
   const matrix = data;
@@ -27,14 +34,14 @@ const ConfusionMatrix = ({ data, darkMode }) => {
   return (
     <div className="d-flex flex-column align-items-center">
       <h6 className="mb-3">Confusion Matrix</h6>
-      
-      <div style={{ 
-        display: 'grid', 
+
+      <div style={{
+        display: 'grid',
         gridTemplateColumns: 'auto 1fr 1fr', // 3 Columns: Label | Box | Box
-        gap: '10px', 
-        alignItems: 'center' 
+        gap: '10px',
+        alignItems: 'center'
       }}>
-        
+
         {/* ROW 1: Top Labels */}
         <div></div> {/* Top-Left Corner (Empty) */}
         <div style={labelStyle}>Pred: 0</div>

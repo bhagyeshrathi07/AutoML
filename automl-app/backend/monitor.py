@@ -1,6 +1,7 @@
 import psutil
 import threading
 import time
+# import pynvml # Uncomment only if you deploy to a Linux server with NVIDIA GPUs
 
 class ResourceMonitor:
     def __init__(self, interval=0.1):
@@ -8,18 +9,29 @@ class ResourceMonitor:
         self.keep_running = False
         self.max_cpu = 0
         self.max_ram = 0
+        self.peak_gpu_mem = 0
 
     def _monitor(self):
+        # Get the current process (this Python script)
+        process = psutil.Process()
+        
         while self.keep_running:
-            # CPU Usage
+            # 1. CPU Usage (%) - System wide is usually fine, but process-specific is also possible
             cpu = psutil.cpu_percent(interval=None)
             self.max_cpu = max(self.max_cpu, cpu)
             
-            # RAM Usage (MB)
-            # We measure the process memory, not system memory
-            process = psutil.Process()
-            ram = process.memory_info().rss / (1024 ** 2) 
-            self.max_ram = max(self.max_ram, ram)
+            # 2. RAM Usage (MB) - SPECIFIC TO THIS APP
+            # rss = Resident Set Size (Physical memory used by the process)
+            ram_mb = process.memory_info().rss / (1024 ** 2) 
+            self.max_ram = max(self.max_ram, ram_mb)
+
+            # 3. GPU Memory (Optional - requires pynvml)
+            # try:
+            #     pynvml.nvmlInit()
+            #     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            #     mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            #     self.peak_gpu_mem = max(self.peak_gpu_mem, mem.used / (1024**2))
+            # except: pass
             
             time.sleep(self.interval)
 
