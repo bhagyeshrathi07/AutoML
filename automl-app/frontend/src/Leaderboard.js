@@ -91,14 +91,14 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
       </div>
 
       {/* TABLE */}
-      <div className="table-responsive shadow-sm rounded">
-        <table className={`table table-bordered align-middle mb-0 ${darkMode ? 'table-dark table-hover' : 'table-striped'}`}>
-          <thead className={darkMode ? 'table-secondary text-dark' : 'table-light'}>
+      <div className="table-responsive rounded-3">
+        <table className="table table-modern align-middle mb-0"> {/* Changed class here */}
+          <thead>
             <tr>
-              <th className="text-center" style={{ width: '60px' }}>Rank</th>
-              <th>Model</th>
+              <th className="text-center ps-3" style={{ width: '60px' }}>#</th>
+              <th>Model Name</th>
 
-              {/* DYNAMIC HEADERS */}
+              {/* DYNAMIC HEADERS (Keep your sortable header logic) */}
               {isClassification ? (
                 <>
                   <SortableHeader label="Accuracy" metricKey="Accuracy" />
@@ -112,36 +112,41 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
                 </>
               )}
 
-              <SortableHeader label="Time (s)" metricKey="Training Time (s)" />
-              <SortableHeader label="RAM (MB)" metricKey="Max RAM (MB)" />
-              <SortableHeader label="CPU (%)" metricKey="Max CPU (%)" />
+              <SortableHeader label="Time" metricKey="Training Time (s)" />
+              <SortableHeader label="RAM" metricKey="Max RAM (MB)" />
+              <SortableHeader label="CPU" metricKey="Max CPU (%)" />
             </tr>
           </thead>
           <tbody>
             {sortedResults.map((r, i) => (
-              <tr key={i} className={i === 0 ? (darkMode ? 'table-active border-success' : 'table-success fw-bold border-2 border-success') : ''}>
-                <td className="text-center h5">{i === 0 ? '🥇' : i + 1}</td>
+              <tr key={i} className={i === 0 ? 'fw-bold' : 'text-muted'}>
+                <td className="text-center">
+                  {i === 0 ? <span className="fs-4">🥇</span> : <span className="badge bg-secondary bg-opacity-10 text-secondary rounded-circle p-2">{i + 1}</span>}
+                </td>
                 <td>
-                  {r.Model}
-                  {i === 0 && <span className="badge bg-success ms-2">WINNER</span>}
+                  <div className="d-flex align-items-center">
+                    {r.Model}
+                    {i === 0 && <span className="badge bg-gradient-success ms-2 shadow-sm" style={{ fontSize: '0.6rem' }}>BEST</span>}
+                  </div>
                 </td>
 
+                {/* Keep your data cells the same, just remove unnecessary borders */}
                 {isClassification ? (
                   <>
-                    <td className={sortKey === 'Accuracy' ? 'fw-bold text-decoration-underline' : ''}>{(r.Accuracy * 100).toFixed(2)}%</td>
-                    <td className={sortKey === 'F1 Score' ? 'fw-bold text-decoration-underline' : ''}>{(r["F1 Score"] * 100).toFixed(2)}%</td>
+                    <td className={sortKey === 'Accuracy' ? 'text-primary fw-bold' : ''}>{(r.Accuracy * 100).toFixed(2)}%</td>
+                    <td className={sortKey === 'F1 Score' ? 'text-primary fw-bold' : ''}>{(r["F1 Score"] * 100).toFixed(2)}%</td>
                   </>
                 ) : (
                   <>
-                    <td className={sortKey === 'R2 Score' ? 'fw-bold text-decoration-underline' : ''}>{r["R2 Score"]}</td>
-                    <td className={sortKey === 'MAE' ? 'fw-bold text-decoration-underline' : ''}>{r["MAE"]}</td>
-                    <td className={sortKey === 'RMSE' ? 'fw-bold text-decoration-underline' : ''}>{r["RMSE"]}</td>
+                    <td className={sortKey === 'R2 Score' ? 'text-primary fw-bold' : ''}>{r["R2 Score"]}</td>
+                    <td>{r["MAE"]}</td>
+                    <td>{r["RMSE"]}</td>
                   </>
                 )}
 
-                <td>{r["Training Time (s)"]}</td>
-                <td className={sortKey === 'Max RAM (MB)' ? 'fw-bold text-decoration-underline' : ''}>{r["Max RAM (MB)"]}</td>
-                <td>{r["Max CPU (%)"]}</td>
+                <td>{r["Training Time (s)"]}s</td>
+                <td>{r["Max RAM (MB)"]} MB</td>
+                <td>{r["Max CPU (%)"]}%</td>
               </tr>
             ))}
           </tbody>
