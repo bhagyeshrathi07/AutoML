@@ -6,6 +6,7 @@ import joblib
 import re
 import random
 
+# Scikit-Learn & XGBoost
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
@@ -15,9 +16,9 @@ from sklearn.metrics import (accuracy_score, f1_score, roc_curve, auc, confusion
                              r2_score, mean_squared_error, mean_absolute_error)
 
 # Models
-from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso, SGDClassifier, SGDRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.svm import SVC, SVR
+from sklearn.svm import SVC, SVR, LinearSVC, LinearSVR
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBClassifier, XGBRegressor
@@ -29,16 +30,43 @@ def clean_column_names(df):
     df.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in df.columns]
     return df
 
-def get_configs(task_type):
+def get_configs(task_type, n_rows):
+    """
+    Returns model configurations.
+    Dynamic Logic: If dataset is large (>10k rows), swaps slow SVM/KNN for fast approximations.
+    """
+    is_large_data = n_rows > 10000
+    
+    print(f"⚡ Model Selection Mode: {'High-Performance (Large Data)' if is_large_data else 'High-Accuracy (Small Data)'}")
+
     if task_type == 'Classification':
+        # FAST SVM: SGDClassifier (O(n)) vs SLOW SVM: SVC (O(n^3))
+        svm_config = {
+            'model': SGDClassifier(loss='hinge', class_weight='balanced', random_state=42),
+            'params': {'classifier__alpha': [0.0001, 0.001, 0.01], 'classifier__penalty': ['l2', 'elasticnet']}
+        } if is_large_data else {
+            'model': SVC(probability=True, class_weight='balanced', random_state=42),
+            'params': {'classifier__C': [0.1, 1, 10], 'classifier__kernel': ['linear', 'rbf']}
+        }
+
         return {
             'Logistic Regression': {'model': LogisticRegression(solver='liblinear', class_weight='balanced'), 'params': {'classifier__C': [0.1, 1, 10]}},
             'Random Forest': {'model': RandomForestClassifier(class_weight='balanced'), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
-            'SVM': {'model': SVC(probability=True, class_weight='balanced'), 'params': {'classifier__C': [0.1, 1], 'classifier__kernel': ['linear', 'rbf']}},
+            'SVM': svm_config,
             'KNN': {'model': KNeighborsClassifier(), 'params': {'classifier__n_neighbors': [3, 5, 7]}},
             'XGBoost': {'model': XGBClassifier(eval_metric='logloss'), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
         }
-    else:
+    else: # Regression
+        # FAST SVR: LinearSVR (O(n)) vs SLOW SVR: SVR (O(n^3))
+        # SGDRegressor is even faster for massive data
+        svr_config = {
+            'model': SGDRegressor(random_state=42),
+            'params': {'classifier__alpha': [0.0001, 0.001], 'classifier__penalty': ['l2', 'elasticnet']}
+        } if is_large_data else {
+            'model': SVR(),
+            'params': {'classifier__C': [0.1, 1], 'classifier__kernel': ['linear', 'rbf']}
+        }
+
         return {
             'Linear Regression': {'model': LinearRegression(), 'params': {}},
             'Ridge': {'model': Ridge(), 'params': {'classifier__alpha': [0.1, 1.0, 10.0]}},
@@ -46,6 +74,7 @@ def get_configs(task_type):
             'Decision Tree': {'model': DecisionTreeRegressor(), 'params': {'classifier__max_depth': [5, 10, 20]}},
             'Random Forest': {'model': RandomForestRegressor(), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
             'KNN': {'model': KNeighborsRegressor(), 'params': {'classifier__n_neighbors': [3, 5, 7]}},
+            'SVM': svr_config, # Renamed from SVR to keep key consistent if desired, or use SVR
             'XGBoost': {'model': XGBRegressor(), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
         }
 
@@ -77,7 +106,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         if y.nunique() > 20:
             task_type = "Regression"
             
-    if callback: callback(15, f"🔍 Task: {task_type}")
+    if callback: callback(15, f"🔍 Task: {task_type} | Rows: {len(df)}")
 
     # --- 3. PREPROCESSING ---
     X = df.drop(columns=[target_column])
@@ -101,13 +130,23 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # --- 4. TRAINING LOOP ---
-    configs = get_configs(task_type)
+    # PASS n_rows to config to trigger smart switching
+    configs = get_configs(task_type, len(X_train))
+    
     results = []
     trained_models = {}
     
-    # Filter models only if selected_models provided AND valid for task
     valid_models = configs.keys()
-    models_to_run = [m for m in valid_models if not selected_models or m in selected_models]
+    # Fuzzy matching for model selection (e.g., "SVM" matches "SVM (Linear)")
+    models_to_run = []
+    if selected_models:
+        for m in selected_models:
+            if m in configs:
+                models_to_run.append(m)
+            elif m == "SVM" and "SVM" in configs: # Handle naming variations
+                models_to_run.append("SVM")
+    else:
+        models_to_run = list(valid_models)
     
     total_models = len(models_to_run)
     current_model_idx = 0
@@ -124,7 +163,9 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         monitor = ResourceMonitor()
         
         with monitor:
-            search = RandomizedSearchCV(clf, config['params'], n_iter=5, cv=3, n_jobs=-1, random_state=42)
+            # Reduce iterations for large data to ensure speed
+            n_iter = 2 if len(X_train) > 10000 else 5
+            search = RandomizedSearchCV(clf, config['params'], n_iter=n_iter, cv=3, n_jobs=-1, random_state=42)
             try:
                 search.fit(X_train, y_train)
             except Exception as e:
@@ -153,19 +194,23 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
             })
             if len(np.unique(y)) == 2:
                 try:
-                    y_prob = best_model.predict_proba(X_test)[:, 1]
-                    fpr, tpr, _ = roc_curve(y_test, y_prob)
-                    metrics["AUC"] = round(auc(fpr, tpr), 4)
-                    metrics["ROCData"] = [{"x": round(f,3), "y": round(t,3)} for f,t in zip(fpr[::5], tpr[::5])]
+                    # Check if model supports predict_proba (SGD with hinge loss does NOT)
+                    if hasattr(best_model.named_steps['classifier'], 'predict_proba'):
+                        y_prob = best_model.predict_proba(X_test)[:, 1]
+                        fpr, tpr, _ = roc_curve(y_test, y_prob)
+                        metrics["AUC"] = round(auc(fpr, tpr), 4)
+                        metrics["ROCData"] = [{"x": round(f,3), "y": round(t,3)} for f,t in zip(fpr[::5], tpr[::5])]
+                    else:
+                        metrics["AUC"] = "N/A (Linear SVM)"
+                        metrics["ROCData"] = []
                 except: pass
         else:
             metrics.update({
                 "R2 Score": round(r2_score(y_test, y_pred), 4),
                 "RMSE": round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
-                "MAE": round(mean_absolute_error(y_test, y_pred), 4) # New Metric
+                "MAE": round(mean_absolute_error(y_test, y_pred), 4)
             })
             
-            # Generate Scatter Plot Data (Sampled to 200 points max for performance)
             indices = np.arange(len(y_test))
             np.random.shuffle(indices)
             sample_indices = indices[:200]
