@@ -23,6 +23,7 @@ function App() {
 
   // Async Task State (Polling)
   const [taskId, setTaskId] = useState(null);
+  const [completedTaskId, setCompletedTaskId] = useState(null); // Store task ID even after completion
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
   const [results, setResults] = useState(null);
@@ -49,6 +50,7 @@ function App() {
 
           if (data.status === 'completed') {
             setResults(data.results);
+            setCompletedTaskId(taskId); // Save task ID for code download
             setLoading(false);
             setTaskId(null); // Stop polling
           } else if (data.status === 'failed') {
@@ -123,6 +125,7 @@ function App() {
     setLoading(true);
     setError('');
     setResults(null);
+    setCompletedTaskId(null); // Clear previous task ID
     setLogs(["🚀 Initializing Upload..."]);
     setProgress(0);
 
@@ -210,7 +213,7 @@ function App() {
         {error && <div className="alert alert-danger mt-3">{error}</div>}
       </div>
 
-      {results && <Leaderboard results={results} darkMode={darkMode} />}
+      {results && <Leaderboard results={results} darkMode={darkMode} taskId={completedTaskId} />}
     </div>
   );
 }
