@@ -4,7 +4,7 @@ import Papa from 'papaparse';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Leaderboard from './Leaderboard';
 
-// Models for specific tasks (Teammate's Feature)
+// Models for specific tasks
 const MODELS_CONFIG = {
   "Classification": ["Logistic Regression", "Random Forest", "SVM", "KNN", "XGBoost"],
   "Regression": ["Linear Regression", "Ridge", "Lasso", "Random Forest", "XGBoost", "Decision Tree"]
@@ -18,7 +18,7 @@ function App() {
 
   // Stats & Task State
   const [dataStats, setDataStats] = useState(null);
-  const [detectedTaskType, setDetectedTaskType] = useState("Classification"); // Default
+  const [detectedTaskType, setDetectedTaskType] = useState("Classification");
   const [selectedModels, setSelectedModels] = useState(MODELS_CONFIG["Classification"]);
 
   // Async Task State (Polling)
@@ -35,7 +35,7 @@ function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  // --- POLLING LOGIC (Crucial for new Backend) ---
+  // --- POLLING LOGIC ---
   useEffect(() => {
     let interval = null;
     if (taskId) {
@@ -50,7 +50,7 @@ function App() {
           if (data.status === 'completed') {
             setResults(data.results);
             setLoading(false);
-            setTaskId(null); // Stop polling
+            setTaskId(null);
           } else if (data.status === 'failed') {
             setError(data.error);
             setLoading(false);
@@ -64,7 +64,7 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId]);
 
-  // --- FILE HANDLING ---
+  // --- FILE HANDLING (UPDATED FOR BETTER STATS) ---
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
@@ -76,21 +76,35 @@ function App() {
       let fileSize = selectedFile.size / 1024;
       let sizeString = fileSize < 1024 ? `${fileSize.toFixed(1)} KB` : `${(fileSize / 1024).toFixed(2)} MB`;
 
+      // 1. FAST PREVIEW: Get Columns & Init Stats immediately
       Papa.parse(selectedFile, {
         header: true,
-        preview: 500, // Preview first 500 rows for fast detection
+        preview: 10, // Only parse first 10 rows for headers
         skipEmptyLines: true,
         complete: (res) => {
           if (res.meta && res.meta.fields) {
             setColumns(res.meta.fields);
             setDataStats({
-              rows: "Calculating...", // Full count requires full parse, simplified here
+              rows: "⏳", // Placeholder while worker counts
               cols: res.meta.fields.length,
               size: sizeString
             });
           }
-          // Auto-detect Task Type based on target (if target was selected immediately)
-          // Real logic happens when target changes below
+        }
+      });
+
+      // 2. BACKGROUND WORKER: Count actual rows (Non-blocking)
+      let rowCount = 0;
+      Papa.parse(selectedFile, {
+        worker: true, // Uses a separate thread
+        header: true,
+        skipEmptyLines: true,
+        step: () => {
+          rowCount++;
+        },
+        complete: () => {
+          // Update state with final count
+          setDataStats(prev => ({ ...prev, rows: rowCount.toLocaleString() }));
         }
       });
     }
@@ -98,10 +112,6 @@ function App() {
 
   // --- TASK DETECTION LOGIC ---
   useEffect(() => {
-    // When target changes, we need to guess if it's Regression or Classification
-    // Note: Since we don't have full data in state to save RAM, we rely on Backend to confirm.
-    // But we can do a simple UI switch based on user preference if needed.
-    // For now, reset models to default of current task type.
     setSelectedModels(MODELS_CONFIG[detectedTaskType]);
   }, [detectedTaskType]);
 
@@ -128,7 +138,7 @@ function App() {
 
     try {
       const res = await axios.post('http://127.0.0.1:5000/upload', formData);
-      setTaskId(res.data.task_id); // Start Polling
+      setTaskId(res.data.task_id);
     } catch (err) {
       setError(err.response?.data?.error || 'Upload Failed');
       setLoading(false);
@@ -140,7 +150,6 @@ function App() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">🤖 AutoML Model Comparator</h1>
 
-        {/* YOUR TOGGLE SWITCH */}
         <div onClick={() => setDarkMode(!darkMode)} style={{ width: '60px', height: '30px', backgroundColor: darkMode ? '#6610f2' : '#ccc', borderRadius: '30px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.3s ease' }}>
           <div style={{ width: '26px', height: '26px', backgroundColor: '#fff', borderRadius: '50%', position: 'absolute', top: '2px', left: darkMode ? '32px' : '2px', transition: 'left 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
             {darkMode ? '🌙' : '☀️'}
@@ -150,26 +159,43 @@ function App() {
 
       <div className="card p-4 shadow-sm mb-4">
         <form onSubmit={handleSubmit}>
-          <div className="row">
-            <div className="col-md-6 mb-3">
+
+          {/* 1. FILE UPLOAD & STATS */}
+          <div className="row mb-3">
+            <div className="col-md-6">
               <label className="form-label fw-bold">1. Upload Dataset (CSV)</label>
               <input type="file" className="form-control" accept=".csv" onChange={handleFileChange} />
-              {/* YOUR STATS BADGE */}
-              {dataStats && (
-                <div className={`mt-2 p-2 rounded border d-inline-block ${darkMode ? 'bg-secondary bg-opacity-25 border-secondary' : 'bg-light border'}`}>
-                  <small className="fw-bold text-success">📊 Data Stats: </small>
-                  <span className="ms-2 small">{dataStats.cols} Columns <span className="mx-2 text-muted">|</span> {dataStats.size}</span>
-                </div>
-              )}
             </div>
-            <div className="col-md-6 mb-3">
+            <div className="col-md-6">
               <label className="form-label fw-bold">2. Target Column</label>
               <input type="text" className="form-control" list="cols" value={target} onChange={e => setTarget(e.target.value)} disabled={!file} placeholder="Type or select..." />
               <datalist id="cols">{columns.map(c => <option key={c} value={c} />)}</datalist>
             </div>
           </div>
 
-          {/* DYNAMIC MODEL SELECTION */}
+          {/* BETTER STATS GRID */}
+          {dataStats && (
+            <div className={`mb-4 p-3 rounded border ${darkMode ? 'bg-secondary bg-opacity-10 border-secondary' : 'bg-light border-light'}`}>
+              <div className="d-flex justify-content-around text-center">
+                <div>
+                  <div className="text-muted small fw-bold text-uppercase">Rows</div>
+                  <div className="fs-5 fw-bold text-primary font-monospace">{dataStats.rows}</div>
+                </div>
+                <div className="border-end border-secondary opacity-25"></div>
+                <div>
+                  <div className="text-muted small fw-bold text-uppercase">Columns</div>
+                  <div className="fs-5 fw-bold text-success font-monospace">{dataStats.cols}</div>
+                </div>
+                <div className="border-end border-secondary opacity-25"></div>
+                <div>
+                  <div className="text-muted small fw-bold text-uppercase">Size</div>
+                  <div className="fs-5 fw-bold text-info font-monospace">{dataStats.size}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3. MODEL SELECTION */}
           <div className="mb-3">
             <div className="d-flex justify-content-between align-items-center mb-2">
               <label className="form-label fw-bold">3. Select Models</label>
@@ -178,7 +204,7 @@ function App() {
                 <option value="Regression">Regression</option>
               </select>
             </div>
-            <div className={`card card-body ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-light'}`}>
+            <div className={`card card-body ${darkMode ? 'bg-secondary bg-opacity-10' : 'bg-white border'}`}>
               <div className="d-flex flex-wrap gap-3">
                 {MODELS_CONFIG[detectedTaskType].map(m => (
                   <div className="form-check" key={m}>
@@ -190,7 +216,7 @@ function App() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary w-100" disabled={loading || !file || !target}>
+          <button type="submit" className="btn btn-primary w-100 btn-lg" disabled={loading || !file || !target}>
             {loading ? `⏳ Pipeline Running... ${progress}%` : '🚀 Launch Pipeline'}
           </button>
         </form>
