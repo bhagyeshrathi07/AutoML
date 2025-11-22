@@ -26,7 +26,7 @@ from xgboost import XGBClassifier, XGBRegressor
 from monitor import ResourceMonitor
 
 def clean_column_names(df):
-    """Teammate's Fix: Cleans column names for XGBoost compatibility"""
+    """Cleans column names for XGBoost compatibility"""
     regex = re.compile(r"\[|\]|<", re.IGNORECASE)
     df.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in df.columns]
     return df
@@ -34,7 +34,7 @@ def clean_column_names(df):
 def get_configs(task_type, n_rows, scale_pos_weight=1):
     """
     Merged Configs:
-    - Uses Teammate's 'Large Data' switching logic (SGD instead of SVM).
+    - Uses 'Large Data' switching logic (SGD instead of SVM).
     - Uses Your 'class_weight=balanced' logic.
     - Uses Your 'scale_pos_weight' for XGBoost.
     - ENHANCED: Wider hyperparameter search spaces for better accuracy.
@@ -153,7 +153,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     
     # Smart Parsing
     df = pd.read_csv(filepath, sep=None, engine='python')
-    df = clean_column_names(df) # Teammate's Regex Fix
+    df = clean_column_names(df) # Regex Fix
     
     # --- YOUR ROBUST CLEANING ---
     if callback: callback(10, "🧹 Cleaning data...")
@@ -262,18 +262,22 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         clf = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', config['model'])])
         
+        # --- 1. START TIMER ---
+        start_time = time.time() 
+
         monitor = ResourceMonitor()
         with monitor:
-            # Increased iterations to handle new hyperparameters
-            # 10 iterations for big data, 20 for small data gives much better results
-            n_iter = 10 if len(X_train) > 10000 else 20 
-            
+            n_iter = 5 # Speed optimized iteration count
             search = RandomizedSearchCV(clf, config['params'], n_iter=n_iter, cv=3, n_jobs=-1, random_state=42)
             try:
                 search.fit(X_train, y_train)
             except Exception as e:
                 print(f"Model {name} failed: {e}")
                 continue
+
+        # --- 2. STOP TIMER ---
+        end_time = time.time()
+        training_duration = round(end_time - start_time, 2)
 
         best_model = search.best_estimator_
         trained_models[name] = best_model 
@@ -282,7 +286,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         metrics = {
             "Model": name,
             "Task Type": task_type,
-            "Training Time (s)": 0.1, # Placeholder
+            "Training Time (s)": training_duration, # <--- FIXED (Was 0.1)
             "Max RAM (MB)": round(monitor.max_ram, 2),
             "Max CPU (%)": monitor.max_cpu,
             "Best Params": search.best_params_
@@ -313,7 +317,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
                         metrics["ROCData"] = []
                 except: pass
         else:
-            # Regression Metrics (Teammate's)
+            # Regression Metrics
             metrics.update({
                 "R2 Score": round(r2_score(y_test, y_pred), 4),
                 "RMSE": round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
