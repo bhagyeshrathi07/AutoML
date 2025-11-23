@@ -1,38 +1,177 @@
-.App {
-  text-align: center;
+/* --- MODERN BACKGROUNDS & GLOBAL --- */
+body {
+  transition: background 0.5s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Light Mode Background (Soft subtle gradient) */
+[data-bs-theme="light"] body {
+  background: radial-gradient(circle at 10% 20%, rgb(240, 245, 255) 0%, rgb(225, 235, 255) 90%);
+  color: #2d3748;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Dark Mode Background (Deep Cyberpunk Blue/Purple) */
+[data-bs-theme="dark"] body {
+  background: radial-gradient(circle at 50% -20%, #1a1e2e 0%, #2d2a48 100%);
+  background-color: #0f1115;
+  color: #e2e8f0;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+/* --- GLASSMORPHISM CARDS --- */
+.glass-card {
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-bs-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+}
+
+[data-bs-theme="dark"] .glass-card {
+  background: rgba(20, 25, 45, 0.7);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* --- MODERN INPUTS & BUTTONS --- */
+.form-control,
+.form-select {
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(150, 150, 150, 0.3);
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  /* See-through inputs */
+}
+
+[data-bs-theme="light"] .form-control,
+[data-bs-theme="light"] .form-select {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25);
+  border-color: #667eea;
+}
+
+.btn {
+  border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 12px 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+}
+
+/* --- TABLE STYLING (Modern Glass) --- */
+.table-modern {
+  border-collapse: separate;
+  border-spacing: 0 10px;
+  /* Row spacing */
+}
+
+.table-modern thead th {
+  border: none;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #a0aec0;
+  padding: 15px;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+
+/* FIX: High Contrast Active Header Column */
+.table-modern thead th.active-head {
+  color: #5a67d8 !important;
+  /* Deep Indigo */
+  background: rgba(90, 103, 216, 0.12);
+  /* Subtle tint */
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(90, 103, 216, 0.2);
+}
+
+[data-bs-theme="dark"] .table-modern thead th.active-head {
+  color: #a3bffa !important;
+  background: rgba(163, 191, 250, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(163, 191, 250, 0.3);
+}
+
+.table-modern tbody tr {
+  /* Glass rows */
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+}
+
+[data-bs-theme="dark"] .table-modern tbody tr {
+  background: rgba(30, 35, 55, 0.6);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.table-modern tbody tr:hover {
+  transform: scale(1.02) translateY(-2px);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="dark"] .table-modern tbody tr:hover {
+  background: rgba(45, 50, 75, 0.8);
+}
+
+.table-modern td {
+  border: none;
+  padding: 20px 15px;
+  vertical-align: middle;
+}
+
+.table-modern td:first-child {
+  border-radius: 16px 0 0 16px;
+  padding-left: 25px;
+}
+
+.table-modern td:last-child {
+  border-radius: 0 16px 16px 0;
+  padding-right: 25px;
+}
+
+/* FIX: THE BEST BADGE */
+.badge-best-glass {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  /* Vibrant Teal/Green */
   color: white;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+  /* Glow effect */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.App-link {
-  color: #61dafb;
+/* UTILS */
+.cursor-pointer {
+  cursor: pointer;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.transition-all {
+  transition: all 0.3s ease;
 }
