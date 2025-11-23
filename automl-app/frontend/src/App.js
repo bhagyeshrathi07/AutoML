@@ -19,6 +19,7 @@ function App() {
   const [detectedTaskType, setDetectedTaskType] = useState("Classification");
   const [selectedModels, setSelectedModels] = useState(MODELS_CONFIG["Classification"]);
   const [taskId, setTaskId] = useState(null);
+  const [completedTaskId, setCompletedTaskId] = useState(null); // Store task ID even after completion
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
   const [results, setResults] = useState(null);
@@ -44,9 +45,20 @@ function App() {
           const data = res.data;
           setProgress(data.progress);
           setLogs(data.logs || []);
-          if (data.status === 'completed') { setResults(data.results); setLoading(false); setTaskId(null); }
-          else if (data.status === 'failed') { setError(data.error); setLoading(false); setTaskId(null); }
-        } catch (err) { console.error(err); }
+
+          if (data.status === 'completed') {
+            setResults(data.results);
+            setCompletedTaskId(taskId); // Save task ID for code download
+            setLoading(false);
+            setTaskId(null); // Stop polling
+          } else if (data.status === 'failed') {
+            setError(data.error);
+            setLoading(false);
+            setTaskId(null);
+          }
+        } catch (err) {
+          console.error("Polling Error:", err);
+        }
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -87,10 +99,24 @@ function App() {
     e.preventDefault();
     if (!file || !target) return;
     const formData = new FormData();
-    formData.append('file', file); formData.append('target', target); formData.append('models', JSON.stringify(selectedModels));
-    setLoading(true); setError(''); setResults(null); setLogs(["🚀 Initializing..."]); setProgress(0);
-    try { const res = await axios.post('http://127.0.0.1:5000/upload', formData); setTaskId(res.data.task_id); }
-    catch (err) { setError('Upload Failed'); setLoading(false); }
+    formData.append('file', file);
+    formData.append('target', target);
+    formData.append('models', JSON.stringify(selectedModels));
+
+    setLoading(true);
+    setError('');
+    setResults(null);
+    setCompletedTaskId(null); // Clear previous task ID
+    setLogs(["🚀 Initializing Upload..."]);
+    setProgress(0);
+
+    try {
+      const res = await axios.post('http://127.0.0.1:5000/upload', formData);
+      setTaskId(res.data.task_id); // Start Polling
+    } catch (err) {
+      setError(err.response?.data?.error || 'Upload Failed');
+      setLoading(false);
+    }
   };
 
   useEffect(() => { setSelectedModels(MODELS_CONFIG[detectedTaskType]); }, [detectedTaskType]);
@@ -209,7 +235,7 @@ function App() {
         {error && <div className="alert alert-danger mt-3 rounded-3 border-0 shadow-sm">{error}</div>}
       </div>
 
-      {results && <Leaderboard results={results} darkMode={darkMode} taskId={taskId} />}
+      {results && <Leaderboard results={results} darkMode={darkMode} taskId={completedTaskId} />}
     </div>
   );
 }
