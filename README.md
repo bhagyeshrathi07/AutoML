@@ -42,20 +42,19 @@ graph TD
     API --> Pipeline[ML Pipeline]
     
     subgraph Backend
-        Pipeline --> TypeDetect[Task Detection (Class vs Reg)]
-        TypeDetect --> Cleaner[Smart Cleaner & Sampling]
-        Cleaner --> Pre[Preprocessing & Scaling]
+        Pipeline --> TypeDetect["Task Detection (Class vs Reg)"]
+        TypeDetect --> Cleaner["Smart Cleaner & Sampling"]
+        Cleaner --> Pre["Preprocessing & Scaling"]
         Pre --> Tuning[Hyperparameter Search]
         Tuning --> Monitor[Resource Monitor Thread]
-        Monitor --> Models[XGBoost / RF / SVM / etc]
+        Monitor --> Models["XGBoost / RF / SVM / etc"]
         
-        Models --> Results[Metrics & Charts]
+        Models --> Results["Metrics & Charts"]
         Results --> CodeGen[Code Generator Engine]
     end
     
     Results --> Leaderboard[JSON Response]
     CodeGen --> Script[Download .py Script]
-```
 
 ---
 
