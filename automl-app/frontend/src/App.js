@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css'; // Make sure to import the new CSS!
+import './App.css';
 import Leaderboard from './Leaderboard';
 
 const MODELS_CONFIG = {
@@ -18,8 +18,11 @@ function App() {
   const [dataStats, setDataStats] = useState(null);
   const [detectedTaskType, setDetectedTaskType] = useState("Classification");
   const [selectedModels, setSelectedModels] = useState(MODELS_CONFIG["Classification"]);
+
+  // Task Management State
   const [taskId, setTaskId] = useState(null);
-  const [completedTaskId, setCompletedTaskId] = useState(null); // Store task ID even after completion
+  const [completedTaskId, setCompletedTaskId] = useState(null);
+
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
   const [results, setResults] = useState(null);
@@ -31,11 +34,7 @@ function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  // --- POLLING & FILE HANDLING (Keep your existing logic here) ---
-  // I am hiding the logic functions for brevity, paste your existing handleFileChange/useEffect/Submit here
-  // ... [PASTE LOGIC HERE] ...
-
-  // --- COPY-PASTE LOGIC START ---
+  // --- POLLING LOGIC ---
   useEffect(() => {
     let interval = null;
     if (taskId) {
@@ -48,9 +47,19 @@ function App() {
 
           if (data.status === 'completed') {
             setResults(data.results);
-            setCompletedTaskId(taskId); // Save task ID for code download
+            setCompletedTaskId(taskId);
             setLoading(false);
-            setTaskId(null); // Stop polling
+            setTaskId(null);
+
+            // --- FIX: SYNC FRONTEND TASK TYPE WITH BACKEND RESULTS ---
+            // If the backend decided this was "Regression", update our UI to match.
+            if (data.results && data.results.length > 0) {
+              const backendTaskType = data.results[0]["Task Type"];
+              if (backendTaskType) {
+                setDetectedTaskType(backendTaskType);
+              }
+            }
+
           } else if (data.status === 'failed') {
             setError(data.error);
             setLoading(false);
@@ -64,6 +73,7 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId]);
 
+  // --- FILE HANDLING ---
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     setFile(selectedFile); setColumns([]); setTarget(''); setDataStats(null);
@@ -75,6 +85,7 @@ function App() {
           if (res.meta && res.meta.fields) {
             setColumns(res.meta.fields);
             setDataStats({ rows: "Calculating...", cols: res.meta.fields.length, size: sizeString });
+
             // Fast Row Estimation Logic
             if (selectedFile.size < 50 * 1024) {
               Papa.parse(selectedFile, { header: true, complete: (r) => setDataStats(p => ({ ...p, rows: r.data.length.toLocaleString() })) });
@@ -98,6 +109,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file || !target) return;
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('target', target);
@@ -106,22 +118,21 @@ function App() {
     setLoading(true);
     setError('');
     setResults(null);
-    setCompletedTaskId(null); // Clear previous task ID
+    setCompletedTaskId(null);
     setLogs(["🚀 Initializing Upload..."]);
     setProgress(0);
 
     try {
       const res = await axios.post('http://127.0.0.1:5000/upload', formData);
-      setTaskId(res.data.task_id); // Start Polling
+      setTaskId(res.data.task_id);
     } catch (err) {
       setError(err.response?.data?.error || 'Upload Failed');
       setLoading(false);
     }
   };
 
+  // Update selected models when task type changes
   useEffect(() => { setSelectedModels(MODELS_CONFIG[detectedTaskType]); }, [detectedTaskType]);
-  // --- COPY-PASTE LOGIC END ---
-
 
   return (
     <div className="container py-5">
@@ -138,7 +149,6 @@ function App() {
           <p className="text-muted mb-0">Upload CSV, Select Target, Relax.</p>
         </div>
 
-        {/* MODERN TOGGLE */}
         <div onClick={() => setDarkMode(!darkMode)} className="glass-card d-flex align-items-center justify-content-center"
           style={{ width: '50px', height: '50px', cursor: 'pointer' }}>
           <span style={{ fontSize: '1.5rem' }}>{darkMode ? '🌙' : '☀️'}</span>
