@@ -26,7 +26,7 @@ from xgboost import XGBClassifier, XGBRegressor
 from monitor import ResourceMonitor
 
 def clean_column_names(df):
-    """Teammate's Fix: Cleans column names for XGBoost compatibility"""
+    """Cleans column names for XGBoost compatibility"""
     regex = re.compile(r"\[|\]|<", re.IGNORECASE)
     df.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in df.columns]
     return df
@@ -34,49 +34,118 @@ def clean_column_names(df):
 def get_configs(task_type, n_rows, scale_pos_weight=1):
     """
     Merged Configs:
-    - Uses Teammate's 'Large Data' switching logic (SGD instead of SVM).
+    - Uses 'Large Data' switching logic (SGD instead of SVM).
     - Uses Your 'class_weight=balanced' logic.
     - Uses Your 'scale_pos_weight' for XGBoost.
+    - ENHANCED: Wider hyperparameter search spaces for better accuracy.
     """
     is_large_data = n_rows > 10000
     
+    # --- SHARED PARAMS (Trees) ---
+    rf_params = {
+        'classifier__n_estimators': [50, 100, 200],
+        'classifier__max_depth': [None, 10, 20, 30],
+        'classifier__min_samples_split': [2, 5, 10],
+        'classifier__min_samples_leaf': [1, 2, 4]
+    }
+    xgb_params = {
+        'classifier__n_estimators': [50, 100, 200],
+        'classifier__learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'classifier__max_depth': [3, 6, 10],
+        'classifier__subsample': [0.7, 0.8, 1.0],
+        'classifier__colsample_bytree': [0.7, 0.8, 1.0]
+    }
+
     if task_type == 'Classification':
         print(f"⚡ Classification Mode: {'High-Performance (SGD)' if is_large_data else 'High-Accuracy (SVM)'}")
         
-        # Smart Switch: Use SGD (Fast) for big data, SVC (Accurate) for small data
-        svm_config = {
-            'model': SGDClassifier(loss='hinge', class_weight='balanced', random_state=42),
-            'params': {'classifier__alpha': [0.0001, 0.001], 'classifier__penalty': ['l2', 'elasticnet']}
-        } if is_large_data else {
+        # SGD (Large Data)
+        sgd_config = {
+            'model': SGDClassifier(loss='hinge', class_weight='balanced', random_state=42, early_stopping=True),
+            'params': {
+                'classifier__alpha': [0.0001, 0.001, 0.01], 
+                'classifier__penalty': ['l2', 'elasticnet'],
+                'classifier__l1_ratio': [0.15, 0.5, 0.85] # Only used if elasticnet
+            }
+        }
+        
+        # SVM (Small Data) - Added Gamma and wider C
+        svc_config = {
             'model': SVC(probability=True, class_weight='balanced', random_state=42),
-            'params': {'classifier__C': [0.1, 1, 10], 'classifier__kernel': ['linear', 'rbf']}
+            'params': {
+                'classifier__C': [0.1, 1, 10, 100], 
+                'classifier__kernel': ['linear', 'rbf'],
+                'classifier__gamma': ['scale', 'auto']
+            }
         }
 
         return {
-            'Logistic Regression': {'model': LogisticRegression(solver='liblinear', class_weight='balanced'), 'params': {'classifier__C': [0.1, 1, 10]}},
-            'Random Forest': {'model': RandomForestClassifier(class_weight='balanced'), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
-            'SVM': svm_config,
-            'KNN': {'model': KNeighborsClassifier(), 'params': {'classifier__n_neighbors': [3, 5, 7]}},
-            'XGBoost': {'model': XGBClassifier(eval_metric='logloss', scale_pos_weight=scale_pos_weight), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}}
+            'Logistic Regression': {
+                'model': LogisticRegression(solver='liblinear', class_weight='balanced', max_iter=1000), 
+                'params': {'classifier__C': [0.01, 0.1, 1, 10, 100], 'classifier__penalty': ['l1', 'l2']}
+            },
+            'Random Forest': {
+                'model': RandomForestClassifier(class_weight='balanced', random_state=42), 
+                'params': rf_params
+            },
+            'SVM': sgd_config if is_large_data else svc_config,
+            'KNN': {
+                'model': KNeighborsClassifier(), 
+                'params': {
+                    'classifier__n_neighbors': [3, 5, 7, 9, 11], 
+                    'classifier__weights': ['uniform', 'distance'],
+                    'classifier__p': [1, 2] # 1=Manhattan, 2=Euclidean
+                }
+            },
+            'XGBoost': {
+                'model': XGBClassifier(eval_metric='logloss', scale_pos_weight=scale_pos_weight, use_label_encoder=False, random_state=42), 
+                'params': xgb_params
+            }
         }
+
     else: # Regression Support
         print(f"⚡ Regression Mode: {'High-Performance (SGD)' if is_large_data else 'High-Accuracy (SVR)'}")
         
+        sgd_reg_config = {
+            'model': SGDRegressor(random_state=42, early_stopping=True),
+            'params': {
+                'classifier__alpha': [0.0001, 0.001, 0.01], 
+                'classifier__penalty': ['l2', 'elasticnet']
+            }
+        }
+
         svr_config = {
-            'model': SGDRegressor(random_state=42),
-            'params': {'classifier__alpha': [0.0001, 0.001], 'classifier__penalty': ['l2', 'elasticnet']}
-        } if is_large_data else {
             'model': SVR(),
-            'params': {'classifier__C': [0.1, 1], 'classifier__kernel': ['linear', 'rbf']}
+            'params': {
+                'classifier__C': [0.1, 1, 10, 100], 
+                'classifier__kernel': ['linear', 'rbf'],
+                'classifier__gamma': ['scale', 'auto']
+            }
         }
 
         return {
-            'Linear Regression': {'model': LinearRegression(), 'params': {}},
-            'Ridge': {'model': Ridge(), 'params': {'classifier__alpha': [0.1, 1.0]}},
-            'Decision Tree': {'model': DecisionTreeRegressor(), 'params': {'classifier__max_depth': [5, 10, 20]}},
-            'Random Forest': {'model': RandomForestRegressor(), 'params': {'classifier__n_estimators': [50, 100], 'classifier__max_depth': [10, 20]}},
-            'XGBoost': {'model': XGBRegressor(), 'params': {'classifier__learning_rate': [0.01, 0.1], 'classifier__n_estimators': [50, 100]}},
-            'SVM': svr_config
+            'Linear Regression': {'model': LinearRegression(), 'params': {'classifier__fit_intercept': [True, False]}},
+            'Ridge': {
+                'model': Ridge(), 
+                'params': {'classifier__alpha': [0.01, 0.1, 1.0, 10.0, 100.0]}
+            },
+            'Decision Tree': {
+                'model': DecisionTreeRegressor(random_state=42), 
+                'params': {
+                    'classifier__max_depth': [5, 10, 20, None],
+                    'classifier__min_samples_split': [2, 5, 10],
+                    'classifier__min_samples_leaf': [1, 2, 4]
+                }
+            },
+            'Random Forest': {
+                'model': RandomForestRegressor(random_state=42), 
+                'params': rf_params
+            },
+            'XGBoost': {
+                'model': XGBRegressor(random_state=42), 
+                'params': xgb_params
+            },
+            'SVM': sgd_reg_config if is_large_data else svr_config
         }
 
 def run_automl(filepath, target_column, selected_models=None, callback=None):
@@ -84,7 +153,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     
     # Smart Parsing
     df = pd.read_csv(filepath, sep=None, engine='python')
-    df = clean_column_names(df) # Teammate's Regex Fix
+    df = clean_column_names(df) # Regex Fix
     
     # --- YOUR ROBUST CLEANING ---
     if callback: callback(10, "🧹 Cleaning data...")
@@ -118,7 +187,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         if df[col].nunique() > 50 and (df[col].nunique() / len(df)) > 0.9:
             df = df.drop(columns=[col])
 
-    # --- YOUR SAMPLING LOGIC (Crucial for Speed) ---
+    # --- SAMPLING LOGIC (Crucial for Speed) ---
     MAX_ROWS = 100000
     if len(df) > MAX_ROWS:
         if callback: callback(12, f"⚠️ Downsampling {len(df)} rows to {MAX_ROWS}...")
@@ -131,7 +200,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         except:
             df = df.sample(n=MAX_ROWS, random_state=42)
 
-    # --- TASK DETECTION (Teammate's Logic) ---
+    # --- TASK DETECTION ---
     y = df[target_column]
     task_type = "Classification"
     if pd.api.types.is_numeric_dtype(y) and y.nunique() > 20:
@@ -147,7 +216,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         le = LabelEncoder()
         y = le.fit_transform(y)
 
-    # Use RobustScaler (Teammate's choice - better for outliers)
+    # Use RobustScaler (better for outliers)
     num_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', RobustScaler())])
     cat_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='most_frequent')), ('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
@@ -161,7 +230,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     else:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # --- YOUR IMBALANCE LOGIC ---
+    # --- IMBALANCE LOGIC ---
     scale_pos_weight = 1
     if task_type == "Classification" and len(np.unique(y)) == 2:
         negatives = np.sum(y_train == 0)
@@ -193,16 +262,22 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         clf = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', config['model'])])
         
+        # --- 1. START TIMER ---
+        start_time = time.time() 
+
         monitor = ResourceMonitor()
         with monitor:
-            # Faster iterations for big data
-            n_iter = 2 if len(X_train) > 10000 else 5
+            n_iter = 5 # Speed optimized iteration count
             search = RandomizedSearchCV(clf, config['params'], n_iter=n_iter, cv=3, n_jobs=-1, random_state=42)
             try:
                 search.fit(X_train, y_train)
             except Exception as e:
                 print(f"Model {name} failed: {e}")
                 continue
+
+        # --- 2. STOP TIMER ---
+        end_time = time.time()
+        training_duration = round(end_time - start_time, 2)
 
         best_model = search.best_estimator_
         trained_models[name] = best_model 
@@ -211,7 +286,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         metrics = {
             "Model": name,
             "Task Type": task_type,
-            "Training Time (s)": 0.1, # Placeholder
+            "Training Time (s)": training_duration, # <--- FIXED (Was 0.1)
             "Max RAM (MB)": round(monitor.max_ram, 2),
             "Max CPU (%)": monitor.max_cpu,
             "Best Params": search.best_params_
@@ -242,7 +317,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
                         metrics["ROCData"] = []
                 except: pass
         else:
-            # Regression Metrics (Teammate's)
+            # Regression Metrics
             metrics.update({
                 "R2 Score": round(r2_score(y_test, y_pred), 4),
                 "RMSE": round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
