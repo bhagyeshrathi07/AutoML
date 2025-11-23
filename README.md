@@ -54,7 +54,8 @@ graph TD
     end
     
     Results --> Leaderboard[JSON Response]
-    CodeGen --> Script[Download .py Script]```
+    CodeGen --> Script[Download .py Script]
+```
 
 ---
 
