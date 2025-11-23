@@ -72,7 +72,6 @@ def background_task(task_id, filepath, target, selected_models):
             print(f"🗑️ Deleted temp file: {filepath}")
 
 # --- ROUTES ---
-
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -126,7 +125,7 @@ def download_model():
 
     filename = model_name.replace(" ", "_") + ".pkl"
     
-    # CRITICAL FIX: Absolute Path to prevent 'File Not Found'
+    # Absolute Path to prevent 'File Not Found'
     base_dir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(base_dir, MODELS_FOLDER, filename)
     

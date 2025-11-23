@@ -103,7 +103,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
             }
         }
 
-    else: # Regression Support
+    else: # Regression
         print(f"⚡ Regression Mode: {'High-Performance (SGD)' if is_large_data else 'High-Accuracy (SVR)'}")
         
         sgd_reg_config = {
@@ -155,7 +155,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
     df = pd.read_csv(filepath, sep=None, engine='python')
     df = clean_column_names(df) # Regex Fix
     
-    # --- YOUR ROBUST CLEANING ---
+    # --- ROBUST CLEANING ---
     if callback: callback(10, "🧹 Cleaning data...")
     
     # A. Drop IDs
@@ -216,7 +216,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         le = LabelEncoder()
         y = le.fit_transform(y)
 
-    # Use RobustScaler (better for outliers)
+    # RobustScaler (better for outliers)
     num_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', RobustScaler())])
     cat_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='most_frequent')), ('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
@@ -286,7 +286,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
         metrics = {
             "Model": name,
             "Task Type": task_type,
-            "Training Time (s)": training_duration, # <--- FIXED (Was 0.1)
+            "Training Time (s)": training_duration,
             "Max RAM (MB)": round(monitor.max_ram, 2),
             "Max CPU (%)": monitor.max_cpu,
             "Best Params": search.best_params_
@@ -300,7 +300,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
                 "Recall": round(recall_score(y_test, y_pred, average='weighted'), 4),
                 "ConfusionMatrix": confusion_matrix(y_test, y_pred).tolist()
             })
-            # Your ROC Logic (Better Visuals)
+            # ROC Logic
             if len(np.unique(y)) == 2:
                 try:
                     if hasattr(best_model.named_steps['classifier'], 'predict_proba'):

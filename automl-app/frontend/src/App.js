@@ -51,7 +51,7 @@ function App() {
             setLoading(false);
             setTaskId(null);
 
-            // --- FIX: SYNC FRONTEND TASK TYPE WITH BACKEND RESULTS ---
+            // --- SYNC FRONTEND TASK TYPE WITH BACKEND RESULTS ---
             // If the backend decided this was "Regression", update our UI to match.
             if (data.results && data.results.length > 0) {
               const backendTaskType = data.results[0]["Task Type"];
