@@ -54,7 +54,7 @@ graph TD
     end
     
     Results --> Leaderboard[JSON Response]
-    CodeGen --> Script[Download model(.pkl) / .py Script]
+    CodeGen --> Script["Download model(.pkl) / .py Script"]
 ```
 
 ---
