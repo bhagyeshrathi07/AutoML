@@ -25,8 +25,21 @@ def generate_training_script(model_name, best_params, task_type, target_col):
         imports = f"from sklearn.neighbors import {'KNeighborsClassifier' if task_type == 'Classification' else 'KNeighborsRegressor'}"
         model_code = f"model = {'KNeighborsClassifier' if task_type == 'Classification' else 'KNeighborsRegressor'}({param_str})"
     elif "SVM" in model_name or "SVR" in model_name:
-        imports = f"from sklearn.svm import {'SVC' if task_type == 'Classification' else 'SVR'}"
-        model_code = f"model = {'SVC' if task_type == 'Classification' else 'SVR'}({param_str})"
+        # DETECT FLAVOR: Check if we tuned 'alpha' (SGD) or 'C' (Standard SVM)
+        is_sgd = any('alpha' in k for k in best_params.keys())
+        
+        if is_sgd:
+            # It's the "Large Data" SGD version
+            imports = f"from sklearn.linear_model import SGD{'Classifier' if task_type == 'Classification' else 'Regressor'}"
+            # We must explicitly add the loss function we chose in pipeline.py
+            loss_param = "loss='modified_huber', " if task_type == 'Classification' else ""
+            model_code = f"model = SGD{'Classifier' if task_type == 'Classification' else 'Regressor'}({loss_param}{param_str})"
+        else:
+            # It's the Standard SVC/SVR version
+            imports = f"from sklearn.svm import {'SVC' if task_type == 'Classification' else 'SVR'}"
+            # Ensure probability is on for SVC to match pipeline behavior
+            prob_param = "probability=True, " if task_type == 'Classification' else ""
+            model_code = f"model = {'SVC' if task_type == 'Classification' else 'SVR'}({prob_param}{param_str})"
 
     metrics_import = ""
     eval_code = ""

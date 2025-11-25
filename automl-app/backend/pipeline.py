@@ -61,7 +61,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
         
         # SGD (Large Data)
         sgd_config = {
-            'model': SGDClassifier(loss='hinge', class_weight='balanced', random_state=42, early_stopping=True),
+            'model': SGDClassifier(loss='modified_huber', class_weight='balanced', random_state=42, early_stopping=True),
             'params': {
                 'classifier__alpha': [0.0001, 0.001, 0.01], 
                 'classifier__penalty': ['l2', 'elasticnet'],
