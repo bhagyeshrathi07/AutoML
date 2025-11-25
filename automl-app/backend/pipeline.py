@@ -7,7 +7,7 @@ import re
 import random
 
 # Scikit-Learn & XGBoost
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, ParameterGrid
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
@@ -178,7 +178,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         # Drop Dates
         try:
-            pd.to_datetime(df[col], errors='raise')
+            pd.to_datetime(df[col], errors='raise', utc=True)
             df = df.drop(columns=[col])
             continue
         except: pass
@@ -267,13 +267,26 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         monitor = ResourceMonitor()
         with monitor:
-            n_iter = 5 # Speed optimized iteration count
-            search = RandomizedSearchCV(clf, config['params'], n_iter=n_iter, cv=3, n_jobs=-1, random_state=42)
-            try:
-                search.fit(X_train, y_train)
-            except Exception as e:
-                print(f"Model {name} failed: {e}")
-                continue
+            # Calculate max possible combinations for this specific model
+            max_combinations = len(ParameterGrid(config['params']))
+            # Set n_iter to 5, OR the max_combinations if the grid is smaller
+            current_n_iter = min(5, max_combinations)
+            # -----------------------
+
+        search = RandomizedSearchCV(
+            clf, 
+            config['params'], 
+            n_iter=current_n_iter, # Use the dynamic variable
+            cv=3, 
+            n_jobs=-1, 
+            random_state=42
+        )
+        
+        try:
+            search.fit(X_train, y_train)
+        except Exception as e:
+            print(f"Model {name} failed: {e}")
+            continue
 
         # --- 2. STOP TIMER ---
         end_time = time.time()
