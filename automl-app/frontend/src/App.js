@@ -6,7 +6,7 @@ import './App.css';
 import Leaderboard from './Leaderboard';
 
 const MODELS_CONFIG = {
-  "Classification": ["Logistic Regression", "Random Forest", "SVM", "KNN", "XGBoost"],
+  "Classification": ["Logistic Regression", "Random Forest", "SVM", "KNN", "XGBoost", "Decision Tree"],
   "Regression": ["Linear Regression", "Ridge", "Lasso", "Random Forest", "XGBoost", "Decision Tree"]
 };
 
@@ -52,7 +52,6 @@ function App() {
             setTaskId(null);
 
             // --- SYNC FRONTEND TASK TYPE WITH BACKEND RESULTS ---
-            // If the backend decided this was "Regression", update our UI to match.
             if (data.results && data.results.length > 0) {
               const backendTaskType = data.results[0]["Task Type"];
               if (backendTaskType) {

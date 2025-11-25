@@ -20,7 +20,7 @@ from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, La
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.svm import SVC, SVR
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from xgboost import XGBClassifier, XGBRegressor
 
 from monitor import ResourceMonitor
@@ -87,6 +87,14 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
             'Random Forest': {
                 'model': RandomForestClassifier(class_weight='balanced', random_state=42), 
                 'params': rf_params
+            },
+             'Decision Tree': {  # <-- new classification algorithm mirroring regression variant
+                'model': DecisionTreeClassifier(class_weight='balanced', random_state=42),
+                'params': {
+                    'classifier__max_depth': [5, 10, 20, None],
+                    'classifier__min_samples_split': [2, 5, 10],
+                    'classifier__min_samples_leaf': [1, 2, 4]
+                }
             },
             'SVM': sgd_config if is_large_data else svc_config,
             'KNN': {
