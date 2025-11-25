@@ -88,7 +88,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
                 'model': RandomForestClassifier(class_weight='balanced', random_state=42), 
                 'params': rf_params
             },
-             'Decision Tree': {  # <-- new classification algorithm mirroring regression variant
+             'Decision Tree': { 
                 'model': DecisionTreeClassifier(class_weight='balanced', random_state=42),
                 'params': {
                     'classifier__max_depth': [5, 10, 20, None],
