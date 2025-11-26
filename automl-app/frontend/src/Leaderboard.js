@@ -160,7 +160,7 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
 
                   <td className={sortKey === 'Training Time (s)' ? 'text-primary fw-bold' : ''}>{r["Training Time (s)"]}s</td>
                   <td className={sortKey === 'Max RAM (MB)' ? 'text-primary fw-bold' : ''}>{r["Max RAM (MB)"]} MB</td>
-                  <td className={sortKey === 'Max CPU (%)' ? 'text-primary fw-bold' : ''}>{r["Max CPU (%)"]}%</td>
+                  <td className={sortKey === 'Max CPU (%)' ? 'text-primary fw-bold' : ''}>{Number(r["Max CPU (%)"]).toFixed(2)}%</td>
                 </tr>
               )
             })}
