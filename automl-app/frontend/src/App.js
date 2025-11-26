@@ -16,8 +16,12 @@ function App() {
   const [target, setTarget] = useState('');
   const [columns, setColumns] = useState([]);
   const [dataStats, setDataStats] = useState(null);
-  const [detectedTaskType, setDetectedTaskType] = useState("Classification");
-  const [selectedModels, setSelectedModels] = useState(MODELS_CONFIG["Classification"]);
+  
+  // CHANGED: Default to null so we can hide the section initially
+  const [detectedTaskType, setDetectedTaskType] = useState(null); 
+  const [isDetecting, setIsDetecting] = useState(false); // UI state for analysis loading
+  
+  const [selectedModels, setSelectedModels] = useState([]);
 
   // Task Management State
   const [taskId, setTaskId] = useState(null);
@@ -33,6 +37,52 @@ function App() {
     document.documentElement.setAttribute('data-bs-theme', darkMode ? 'dark' : 'light');
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
+
+  // --- AUTOMATIC TASK TYPE DETECTION ---
+  useEffect(() => {
+    if (!file || !target) {
+      setDetectedTaskType(null);
+      setSelectedModels([]);
+      return;
+    }
+
+    setIsDetecting(true);
+
+    // Parse the first 1000 rows to analyze the target column
+    Papa.parse(file, {
+      header: true,
+      preview: 1000, 
+      complete: (results) => {
+        const rows = results.data;
+        // Extract target values, filtering out empty/undefined
+        const values = rows.map(r => r[target]).filter(v => v !== null && v !== undefined && v !== '');
+        
+        if (values.length === 0) {
+          setIsDetecting(false);
+          return;
+        }
+
+        // 1. Check if values are numeric
+        const isNumeric = values.every(val => !isNaN(parseFloat(val)) && isFinite(val));
+        
+        // 2. Check cardinality (number of unique values)
+        const uniqueValues = new Set(values).size;
+        
+        // Heuristic: If numeric and has many unique values relative to sample -> Regression
+        // Otherwise -> Classification
+        let type = "Classification";
+        if (isNumeric && uniqueValues > 10) {
+           type = "Regression";
+        }
+
+        setDetectedTaskType(type);
+        setSelectedModels(MODELS_CONFIG[type]); // Auto-select relevant models
+        setIsDetecting(false);
+      }
+    });
+
+  }, [target, file]);
+
 
   // --- POLLING LOGIC ---
   useEffect(() => {
@@ -50,15 +100,6 @@ function App() {
             setCompletedTaskId(taskId);
             setLoading(false);
             setTaskId(null);
-
-            // --- SYNC FRONTEND TASK TYPE WITH BACKEND RESULTS ---
-            if (data.results && data.results.length > 0) {
-              const backendTaskType = data.results[0]["Task Type"];
-              if (backendTaskType) {
-                setDetectedTaskType(backendTaskType);
-              }
-            }
-
           } else if (data.status === 'failed') {
             setError(data.error);
             setLoading(false);
@@ -75,7 +116,13 @@ function App() {
   // --- FILE HANDLING ---
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    setFile(selectedFile); setColumns([]); setTarget(''); setDataStats(null);
+    // Reset states on new file
+    setFile(selectedFile); 
+    setColumns([]); 
+    setTarget(''); 
+    setDataStats(null);
+    setDetectedTaskType(null); // Hide model zoo
+
     if (selectedFile) {
       let sizeString = selectedFile.size / 1024 < 1024 ? `${(selectedFile.size / 1024).toFixed(1)} KB` : `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`;
       Papa.parse(selectedFile, {
@@ -112,6 +159,8 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('target', target);
+    // Send the task type explicitly to backend if needed, or just models
+    formData.append('task_type', detectedTaskType); 
     formData.append('models', JSON.stringify(selectedModels));
 
     setLoading(true);
@@ -130,8 +179,12 @@ function App() {
     }
   };
 
-  // Update selected models when task type changes
-  useEffect(() => { setSelectedModels(MODELS_CONFIG[detectedTaskType]); }, [detectedTaskType]);
+  // Allow manual override of task type
+  const handleTaskTypeChange = (e) => {
+      const newType = e.target.value;
+      setDetectedTaskType(newType);
+      setSelectedModels(MODELS_CONFIG[newType]);
+  }
 
   return (
     <div className="container py-5">
@@ -194,32 +247,46 @@ function App() {
 
           <hr className="my-4 opacity-25" />
 
-          {/* 3. MODEL SELECTION */}
-          <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <label className="form-label fw-bold text-uppercase small text-muted tracking-wide mb-0">3. Model Zoo</label>
-              <select className="form-select w-auto form-select-sm py-1" value={detectedTaskType} onChange={(e) => setDetectedTaskType(e.target.value)}>
-                <option value="Classification">🎯 Classification</option>
-                <option value="Regression">📈 Regression</option>
-              </select>
-            </div>
+          {/* LOADING STATE FOR DETECTION */}
+          {isDetecting && (
+             <div className="text-center py-4">
+                 <div className="spinner-border text-primary mb-2" role="status"></div>
+                 <p className="text-muted small">Analyzing target column to determine task type...</p>
+             </div>
+          )}
 
-            <div className="d-flex flex-wrap gap-2">
-              {MODELS_CONFIG[detectedTaskType].map(m => (
-                <div key={m} onClick={() => handleModelToggle(m)}
-                  className={`px-3 py-2 rounded-pill border cursor-pointer transition-all ${selectedModels.includes(m)
-                    ? 'bg-primary text-white border-primary shadow-sm'
-                    : 'bg-transparent text-muted border-secondary'
-                    }`}
-                  style={{ cursor: 'pointer', fontSize: '0.9rem', transition: '0.2s' }}>
-                  {selectedModels.includes(m) && <span className="me-2">✓</span>}
-                  {m}
+          {/* 3. MODEL SELECTION (HIDDEN UNTIL DETECTED) */}
+          {detectedTaskType && !isDetecting && (
+            <div className="mb-4 animate__animated animate__fadeIn">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className='d-flex align-items-center gap-2'>
+                    <label className="form-label fw-bold text-uppercase small text-muted tracking-wide mb-0">3. Model Zoo</label>
+                    <span className="badge bg-secondary bg-opacity-25 text-body border">Detected: {detectedTaskType}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+                
+                <select className="form-select w-auto form-select-sm py-1" value={detectedTaskType} onChange={handleTaskTypeChange}>
+                  <option value="Classification">🎯 Classification</option>
+                  <option value="Regression">📈 Regression</option>
+                </select>
+              </div>
 
-          <button type="submit" className="btn btn-primary w-100 py-3 shadow-lg" disabled={loading || !file || !target}>
+              <div className="d-flex flex-wrap gap-2">
+                {MODELS_CONFIG[detectedTaskType].map(m => (
+                  <div key={m} onClick={() => handleModelToggle(m)}
+                    className={`px-3 py-2 rounded-pill border cursor-pointer transition-all ${selectedModels.includes(m)
+                      ? 'bg-primary text-white border-primary shadow-sm'
+                      : 'bg-transparent text-muted border-secondary'
+                      }`}
+                    style={{ cursor: 'pointer', fontSize: '0.9rem', transition: '0.2s' }}>
+                    {selectedModels.includes(m) && <span className="me-2">✓</span>}
+                    {m}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary w-100 py-3 shadow-lg" disabled={loading || !file || !target || !detectedTaskType}>
             {loading ? (
               <span><span className="spinner-border spinner-border-sm me-2"></span> Processing Pipeline...</span>
             ) : (
