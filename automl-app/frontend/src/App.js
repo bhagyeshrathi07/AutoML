@@ -16,11 +16,11 @@ function App() {
   const [target, setTarget] = useState('');
   const [columns, setColumns] = useState([]);
   const [dataStats, setDataStats] = useState(null);
-  
-  // CHANGED: Default to null so we can hide the section initially
-  const [detectedTaskType, setDetectedTaskType] = useState(null); 
+
+  // Default to null so we can hide the section initially
+  const [detectedTaskType, setDetectedTaskType] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false); // UI state for analysis loading
-  
+
   const [selectedModels, setSelectedModels] = useState([]);
 
   // Task Management State
@@ -51,12 +51,12 @@ function App() {
     // Parse the first 1000 rows to analyze the target column
     Papa.parse(file, {
       header: true,
-      preview: 1000, 
+      preview: 1000,
       complete: (results) => {
         const rows = results.data;
         // Extract target values, filtering out empty/undefined
         const values = rows.map(r => r[target]).filter(v => v !== null && v !== undefined && v !== '');
-        
+
         if (values.length === 0) {
           setIsDetecting(false);
           return;
@@ -64,15 +64,15 @@ function App() {
 
         // 1. Check if values are numeric
         const isNumeric = values.every(val => !isNaN(parseFloat(val)) && isFinite(val));
-        
+
         // 2. Check cardinality (number of unique values)
         const uniqueValues = new Set(values).size;
-        
+
         // Heuristic: If numeric and has many unique values relative to sample -> Regression
         // Otherwise -> Classification
         let type = "Classification";
         if (isNumeric && uniqueValues > 10) {
-           type = "Regression";
+          type = "Regression";
         }
 
         setDetectedTaskType(type);
@@ -117,11 +117,11 @@ function App() {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     // Reset states on new file
-    setFile(selectedFile); 
-    setColumns([]); 
-    setTarget(''); 
+    setFile(selectedFile);
+    setColumns([]);
+    setTarget('');
     setDataStats(null);
-    setDetectedTaskType(null); // Hide model zoo
+    setDetectedTaskType(null); // Hide model zoo initially
 
     if (selectedFile) {
       let sizeString = selectedFile.size / 1024 < 1024 ? `${(selectedFile.size / 1024).toFixed(1)} KB` : `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`;
@@ -160,7 +160,7 @@ function App() {
     formData.append('file', file);
     formData.append('target', target);
     // Send the task type explicitly to backend if needed, or just models
-    formData.append('task_type', detectedTaskType); 
+    formData.append('task_type', detectedTaskType);
     formData.append('models', JSON.stringify(selectedModels));
 
     setLoading(true);
@@ -181,9 +181,9 @@ function App() {
 
   // Allow manual override of task type
   const handleTaskTypeChange = (e) => {
-      const newType = e.target.value;
-      setDetectedTaskType(newType);
-      setSelectedModels(MODELS_CONFIG[newType]);
+    const newType = e.target.value;
+    setDetectedTaskType(newType);
+    setSelectedModels(MODELS_CONFIG[newType]);
   }
 
   return (
@@ -249,10 +249,10 @@ function App() {
 
           {/* LOADING STATE FOR DETECTION */}
           {isDetecting && (
-             <div className="text-center py-4">
-                 <div className="spinner-border text-primary mb-2" role="status"></div>
-                 <p className="text-muted small">Analyzing target column to determine task type...</p>
-             </div>
+            <div className="text-center py-4">
+              <div className="spinner-border text-primary mb-2" role="status"></div>
+              <p className="text-muted small">Analyzing target column to determine task type...</p>
+            </div>
           )}
 
           {/* 3. MODEL SELECTION (HIDDEN UNTIL DETECTED) */}
@@ -260,10 +260,10 @@ function App() {
             <div className="mb-4 animate__animated animate__fadeIn">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div className='d-flex align-items-center gap-2'>
-                    <label className="form-label fw-bold text-uppercase small text-muted tracking-wide mb-0">3. Model Zoo</label>
-                    <span className="badge bg-secondary bg-opacity-25 text-body border">Detected: {detectedTaskType}</span>
+                  <label className="form-label fw-bold text-uppercase small text-muted tracking-wide mb-0">3. Model Zoo</label>
+                  <span className="badge bg-secondary bg-opacity-25 text-body border">Detected: {detectedTaskType}</span>
                 </div>
-                
+
                 <select className="form-select w-auto form-select-sm py-1" value={detectedTaskType} onChange={handleTaskTypeChange}>
                   <option value="Classification">🎯 Classification</option>
                   <option value="Regression">📈 Regression</option>
