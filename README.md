@@ -194,8 +194,71 @@ automl-app/
 * **XGBoost:** Dynamically calculates `scale_pos_weight` (Negative/Positive ratio) to boost minority class detection.
 
 ### 🖥️ Real-Time Resource Monitoring
-The `ResourceMonitor` runs in a separate thread context. It snapshots memory usage every 0.1s. This allows the leaderboard to show exactly how much RAM a specific model architecture consumed during training, helping users choose "production-friendly" models.
+The `ResourceMonitor` runs in a separate thread context, sampling memory and CPU usage every 0.2 seconds. This provides accurate metrics showing exactly how much RAM and CPU each model architecture consumed during training, helping users choose production-friendly models.
 
+### 🔧 Hyperparameter Optimization
+* **RandomizedSearchCV:** Explores hyperparameter space efficiently
+* **Expanded Search Spaces:** 
+  - SVM: C, kernel, gamma parameters
+  - Trees: max_depth, min_samples_split, min_samples_leaf
+  - XGBoost: learning_rate, n_estimators, subsample, colsample_bytree
+* **Adaptive Tuning:** Adjusts n_iter based on search space size
+
+---
+
+## 📊 Supported Models
+
+### Classification Models
+1. **Logistic Regression** - Fast linear baseline with L1/L2 regularization
+2. **Random Forest** - Ensemble learning with class balancing
+3. **Support Vector Machine (SVM)** - Kernel-based classification (auto-switches to SGD for large datasets)
+4. **K-Nearest Neighbors (KNN)** - Instance-based learning
+5. **XGBoost** - Gradient boosting with scale_pos_weight optimization
+6. **Decision Tree** - Interpretable tree-based classifier
+
+### Regression Models
+1. **Linear Regression** - Simple linear baseline
+2. **Random Forest** - Ensemble regression with variance reduction
+3. **Support Vector Regression (SVR)** - Kernel-based regression (auto-switches to SGD for large datasets)
+4. **XGBoost** - Gradient boosting for regression
+5. **Decision Tree** - Interpretable tree-based regressor
+
+---
+
+## 🎨 UI Features
+
+### Dark/Light Mode
+Toggle between themes with persistent localStorage saving
+
+### Glassmorphism Design
+* Frosted glass effect cards
+* Gradient backgrounds
+* Smooth animations and transitions
+* Responsive design for all screen sizes
+
+### Real-Time Feedback
+* Progress bar with percentage
+* Live training logs with monospace font
+* Emoji-enhanced status messages
+* Animated loading states
+
+---
+
+## 📈 Metrics & Visualizations
+
+### Classification Metrics
+* **Accuracy:** Overall correctness
+* **F1 Score:** Harmonic mean of precision and recall
+* **Precision:** True positive rate
+* **Recall:** Sensitivity measure
+* **ROC-AUC:** Area under receiver operating characteristic curve
+* **Confusion Matrix:** Visual breakdown of predictions
+
+### Regression Metrics
+* **R² Score:** Coefficient of determination
+* **RMSE:** Root mean squared error
+* **MAE:** Mean absolute error
+* **Scatter Plot:** Actual vs. predicted with perfect fit line
 ---
 
 ## 🔮 Future Roadmap
@@ -203,3 +266,38 @@ The `ResourceMonitor` runs in a separate thread context. It snapshots memory usa
 * [ ] **Feature Engineering:** Automated interaction terms and polynomial features.
 * [ ] **Ensemble Builder:** Option to stack the top 3 models into a Voting Classifier.
 * [ ] **Deployment API:** One-click generation of a `predict.py` Flask wrapper.
+**Feature Engineering:** Automated interaction terms and polynomial features
+* [ ] **Ensemble Builder:** One-click stacking of top 3 models into voting classifier/regressor
+* [ ] **Neural Networks:** Add TensorFlow/PyTorch models for deep learning
+* [ ] **Time Series Support:** Add ARIMA, Prophet, and LSTM models
+* [ ] **Deployment API:** One-click generation of production-ready Flask/FastAPI wrapper
+* [ ] **Cloud Integration:** Direct deployment to AWS/GCP/Azure
+* [ ] **Explainability:** SHAP values and feature importance visualization
+* [ ] **Automated Feature Selection:** Remove redundant/irrelevant features
+* [ ] **Multi-target Support:** Handle multiple target columns simultaneously
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request to the [GitHub repository](https://github.com/bhagyeshrathi07/AutoML).
+
+
+## 📄 License
+
+This project is open source and available under the MIT License.
+
+## 🔗 Links
+
+* **GitHub Repository:** [https://github.com/bhagyeshrathi07/AutoML](https://github.com/bhagyeshrathi07/AutoML)
+* **Issues & Feature Requests:** [GitHub Issues](https://github.com/bhagyeshrathi07/AutoML/issues)
+
+---
+
+## 👥 Authors
+
+Built by the AutoML Team:
+ - Bhagyesh Rathi
+ - Hriday Ampavatina
+ - Akshay Kumar
+ - Ronak Patel
