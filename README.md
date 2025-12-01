@@ -1,36 +1,45 @@
 # 🤖 AutoML Model Comparator & Code Generator
 
-> **A Modern, Full-Stack AutoML Platform for Classification & Regression.** > *Now featuring Python Code Generation, Glassmorphism UI, and Resource Profiling.*
+> **A Modern, Full-Stack AutoML Platform for Classification & Regression.** 
+> *Featuring Python Code Generation, Glassmorphism UI, and Resource Profiling.*
 
-This application allows users to upload any dataset (CSV), automatically detects the task type (**Classification** or **Regression**), and trains multiple state-of-the-art models in parallel. 
+This application allows users to upload any dataset (CSV), automatically detects the task type (**Classification** or **Regression**) and trains multiple state-of-the-art machine learning models in parallel.
 
-It goes beyond simple metrics by providing a **Resource-Aware Leaderboard** (CPU/RAM efficiency), **Interactive Visualizations** (ROC/Confusion Matrix/Scatter Plots), and a unique **Code Generation Engine** that writes a clean, reproduceable Python script for your winning model.
+It goes beyond simple metrics by providing a **Resource-Aware Leaderboard** (CPU/RAM efficiency), **Interactive Visualizations** (ROC Curves/Confusion Matrices/Scatter Plots), and a unique **Code Generation Engine** that writes clean, reproducible Python scripts for your winning model.
 
 ---
 
 ## 🌟 Key Features
 
 ### 🧠 Dual-Mode Machine Learning
-* **🎯 Classification:** Logistic Regression, Random Forest, SVM, KNN, XGBoost.
-    * *Metrics:* Accuracy, F1 Score, ROC-AUC.
-    * *Visuals:* Interactive ROC Curves & Confusion Matrices.
-* **📈 Regression:** Linear Regression, Ridge, Lasso, Decision Trees, Random Forest, XGBoost.
-    * *Metrics:* R2 Score, RMSE, MAE.
-    * *Visuals:* Actual vs. Predicted Scatter Plots with Perfect Fit lines.
+* **🎯 Classification:** Logistic Regression, Random Forest, SVM, KNN, XGBoost, Decision Tree
+    * *Metrics:* Accuracy, F1 Score, Precision, Recall, ROC-AUC
+    * *Visuals:* Interactive ROC Curves & Confusion Matrices
+* **📈 Regression:** Linear Regression, Random Forest, XGBoost, Decision Tree, SVM (SVR/SGD)
+    * *Metrics:* R² Score, RMSE, MAE
+    * *Visuals:* Actual vs. Predicted Scatter Plots with Perfect Fit lines
+
+### 🎯 Intelligent Task Detection
+* **Automatic Classification/Regression Detection:** Analyzes your target column and automatically determines whether your problem is classification or regression
+* **Smart Model Recommendations:** Automatically selects the most appropriate models for your detected task type
+* **Manual Override:** Users can override automatic detection if needed
 
 ### ⚡ Performance & Optimization
 * **Expanded Hyperparameter Tuning:** Uses `RandomizedSearchCV` with an expanded search space (e.g., `gamma` for SVM, `subsample` for XGBoost, `min_samples_leaf` for Trees).
 * **Smart Model Switching:** Automatically switches from computationally expensive models (SVM/SVR) to optimized equivalents (SGD) when dataset rows exceed 2,000.
 * **Hardware Profiling:** A custom context manager tracks **Peak RAM (MB)** and **CPU Usage (%)** for every specific model training run.
+* **Stratified Sampling:** Maintains class distribution when downsampling large classification datasets
 
 ### 🎨 Modern UX & "Glassmorphism" UI
 * **Instant Data Stats:** Uses an intelligent "Chunk Reader" to estimate row counts for large files (1GB+) in milliseconds without freezing the browser.
 * **Aesthetic Design:** Features a custom CSS **Glassmorphism** interface, animated gradients, and a polished Dark/Light mode.
 * **Sortable Leaderboard:** Rank models by Accuracy/R2, but also by Training Time or RAM efficiency.
+* **Real-time Progress:** Live progress bar and logs during model training
 
 ### 📜 Reproducibility
 * **Download Model:** Export the serialized `.pkl` file for immediate deployment.
 * **Generate Script (New):** Click one button to generate a clean, standalone `train_model.py` script pre-filled with the **exact hyperparameters** of the winning model.
+* **Full Pipeline Code:** Generated scripts include complete preprocessing, training, and evaluation code
 
 ---
 
@@ -62,19 +71,19 @@ graph TD
 ## 🛠 Tech Stack
 
 ### **Backend (Python)**
-* **Flask:** REST API & Background Threading.
-* **Scikit-Learn:** Models, Pipelines, Imputation, and Metrics.
-* **XGBoost:** Optimized Gradient Boosting.
-* **Joblib:** Model serialization.
-* **Psutil:** Real-time hardware resource tracking.
-* **Pandas & Numpy:** Data processing and vectorization.
+* **Flask:** REST API & Background Threading
+* **Scikit-Learn:** Models, Pipelines, Imputation, and Metrics
+* **XGBoost:** Optimized Gradient Boosting
+* **Joblib:** Model serialization
+* **Psutil:** Real-time hardware resource tracking
+* **Pandas & Numpy:** Data processing and vectorization
 
 ### **Frontend (React)**
-* **React 18:** Hooks-based UI architecture.
-* **Custom CSS:** Glassmorphism, gradients, and animations (No standard Bootstrap theme).
-* **Recharts:** Responsive visualizations (ROC & Scatter).
-* **PapaParse:** Worker-based CSV parsing for large files.
-* **Axios:** Async polling and file uploads.
+* **React 18:** Hooks-based UI architecture
+* **Custom CSS:** Glassmorphism, gradients, and animations (No standard Bootstrap theme)
+* **Recharts:** Responsive visualizations (ROC & Scatter)
+* **PapaParse:** Worker-based CSV parsing for large files
+* **Axios:** Async polling and file uploads
 
 ---
 
@@ -82,14 +91,14 @@ graph TD
 
 ### 1. Prerequisites
 * Python 3.8+
-* Node.js & npm
+* Node.js 14+ & npm
 * *(macOS Users only)*: `brew install libomp` (Required for XGBoost)
 
 ### 2. Backend Setup
 Navigate to the backend folder and set up the Python environment.
 
 ```bash
-cd backend
+cd automl-app/backend
 
 # Create Virtual Environment
 python3 -m venv .venv
@@ -98,7 +107,7 @@ python3 -m venv .venv
 # On macOS/Linux:
 source .venv/bin/activate
 # On Windows:
-# .venv\Scripts\activate
+.venv\Scripts\activate
 
 # Install Dependencies
 pip install -r requirements.txt
@@ -108,7 +117,7 @@ pip install -r requirements.txt
 Open a new terminal, navigate to the frontend folder, and install Node modules.
 
 ```bash
-cd frontend
+cd automl-app/frontend
 
 # Install dependencies
 npm install
@@ -133,10 +142,11 @@ npm start
 *App opens at `http://localhost:3000`*
 
 ### 3. Run the Pipeline
-1.  **Upload:** Drop your CSV file. The app instantly estimates rows/cols.
-2.  **Select Target:** Choose your prediction target from the dropdown.
-3.  **Task Detection:** The app auto-suggests Classification or Regression (you can override this).
-4.  **Launch:** Watch the real-time logs as models train in parallel.
+1.  **Upload:** Drop your CSV file. The app instantly estimates rows/cols
+2.  **Select Target:** Choose your prediction target from the dropdown
+3.  **Task Detection:** The app auto-suggests Classification or Regression (you can override this)
+4.  **Model Selection:** Review auto-selected models or manually adjust the selection
+5.  **Launch:** Click "🚀 Launch Experiment" and watch the real-time logs as models train in parallel
 
 ### 4. Analyze, Export, Reproduce
 1.  **Sort:** Click "RAM" or "Time" headers to find efficient models, or "Accuracy/R2" for best performance.
@@ -175,12 +185,12 @@ automl-app/
 ## 🧠 Advanced Logic Explained
 
 ### ⚡ Smart Downsampling & Stratification
-* **Classification:** If rows > 100,000, the app performs **Stratified Sampling** to maintain class ratios (e.g., keeping fraud cases intact).
-* **Regression:** Uses Random Sampling (Stratification is mathematically impossible for continuous targets).
+* **Classification:** For datasets >100,000 rows, the app performs **Stratified Sampling** to maintain class ratios (e.g., preserving minority class representation)
+* **Regression:** Uses Random Sampling (Stratification is not applicable for continuous targets).
 * **Large Data Handling:** If rows > 2,000, the pipeline swaps slow `SVC/SVR` for `SGDClassifier/SGDRegressor` to prevent server timeouts while maintaining accuracy.
 
 ### 📉 Imbalance Handling
-* **Class Weights:** Automatically calculates `class_weight='balanced'` for Tree models.
+* **Class Weights:** Automatically calculates `class_weight='balanced'` for most of the models.
 * **XGBoost:** Dynamically calculates `scale_pos_weight` (Negative/Positive ratio) to boost minority class detection.
 
 ### 🖥️ Real-Time Resource Monitoring
