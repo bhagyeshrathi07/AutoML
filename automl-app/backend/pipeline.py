@@ -16,7 +16,7 @@ from sklearn.metrics import (accuracy_score, f1_score, roc_curve, auc, confusion
                              r2_score, mean_squared_error, mean_absolute_error, precision_score, recall_score)
 
 # Models
-from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso, SGDClassifier, SGDRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression, SGDClassifier, SGDRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.svm import SVC, SVR
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
@@ -34,10 +34,11 @@ def clean_column_names(df):
 def get_configs(task_type, n_rows, scale_pos_weight=1):
     """
     Merged Configs:
-    - Uses 'Large Data' switching logic (SGD instead of SVM).
-    - Uses Your 'class_weight=balanced' logic.
-    - Uses Your 'scale_pos_weight' for XGBoost.
+    - Uses 'Large Data' switching logic (SGD instead of SVM/SVR).
+    - Uses 'class_weight=balanced' logic for classification.
+    - Uses 'scale_pos_weight' for XGBoost classification.
     - ENHANCED: Wider hyperparameter search spaces for better accuracy.
+    - Ridge and Lasso removed completely.
     """
     is_large_data = n_rows > 10000
     
@@ -88,7 +89,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
                 'model': RandomForestClassifier(class_weight='balanced', random_state=42), 
                 'params': rf_params
             },
-             'Decision Tree': { 
+            'Decision Tree': { 
                 'model': DecisionTreeClassifier(class_weight='balanced', random_state=42),
                 'params': {
                     'classifier__max_depth': [5, 10, 20, None],
@@ -133,10 +134,6 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
 
         return {
             'Linear Regression': {'model': LinearRegression(), 'params': {'classifier__fit_intercept': [True, False]}},
-            'Ridge': {
-                'model': Ridge(), 
-                'params': {'classifier__alpha': [0.01, 0.1, 1.0, 10.0, 100.0]}
-            },
             'Decision Tree': {
                 'model': DecisionTreeRegressor(random_state=42), 
                 'params': {
