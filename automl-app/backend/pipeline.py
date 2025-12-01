@@ -106,7 +106,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
                 }
             },
             'XGBoost': {
-                'model': XGBClassifier(eval_metric='logloss', scale_pos_weight=scale_pos_weight, use_label_encoder=False, random_state=42), 
+                'model': XGBClassifier(eval_metric='logloss', scale_pos_weight=scale_pos_weight, use_label_encoder=False, random_state=42, nthread=1), 
                 'params': xgb_params
             }
         }
@@ -150,7 +150,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
                 'params': rf_params
             },
             'XGBoost': {
-                'model': XGBRegressor(random_state=42), 
+                'model': XGBRegressor(random_state=42, nthread=1), 
                 'params': xgb_params
             },
             'SVM': sgd_reg_config if is_large_data else svr_config
@@ -270,33 +270,35 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
 
         clf = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', config['model'])])
         
-        # --- 1. START TIMER ---
-        start_time = time.time() 
-
-        monitor = ResourceMonitor()
-        with monitor:
-            # Calculate max possible combinations for this specific model
-            max_combinations = len(ParameterGrid(config['params']))
-            # Set n_iter to 5, OR the max_combinations if the grid is smaller
-            current_n_iter = min(5, max_combinations)
-            # -----------------------
-
+        # Calculate max possible combinations
+        max_combinations = len(ParameterGrid(config['params']))
+        current_n_iter = min(5, max_combinations)
+        
+        # CRITICAL FIX: Use n_jobs=1 for XGBoost on Windows
+        n_jobs_param = 1 if 'XGBoost' in name else -1
+        
         search = RandomizedSearchCV(
             clf, 
             config['params'], 
-            n_iter=current_n_iter, # Use the dynamic variable
+            n_iter=current_n_iter,
             cv=3, 
-            n_jobs=-1, 
+            n_jobs=n_jobs_param, 
             random_state=42
         )
         
-        try:
-            search.fit(X_train, y_train)
-        except Exception as e:
-            print(f"Model {name} failed: {e}")
-            continue
-
-        # --- 2. STOP TIMER ---
+        # --- START TIMER & MONITOR ---
+        start_time = time.time()
+        
+        # CRITICAL FIX: Monitor MUST wrap the actual training!
+        monitor = ResourceMonitor()
+        with monitor:
+            try:
+                search.fit(X_train, y_train)
+            except Exception as e:
+                print(f"Model {name} failed: {e}")
+                continue
+        
+        # --- STOP TIMER ---
         end_time = time.time()
         training_duration = round(end_time - start_time, 2)
 
@@ -309,7 +311,7 @@ def run_automl(filepath, target_column, selected_models=None, callback=None):
             "Task Type": task_type,
             "Training Time (s)": training_duration,
             "Max RAM (MB)": round(monitor.max_ram, 2),
-            "Max CPU (%)": monitor.max_cpu,
+            "Max CPU (%)": round(monitor.max_cpu, 2),
             "Best Params": search.best_params_
         }
 
