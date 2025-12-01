@@ -33,7 +33,7 @@ class ResourceMonitor:
                 if normalized_cpu > 0:
                     self.max_cpu = max(self.max_cpu, normalized_cpu)
 
-                # RAM: Always reliable
+                # RAM
                 ram_mb = self.process.memory_info().rss / (1024 ** 2)
                 self.max_ram = max(self.max_ram, ram_mb)
 
