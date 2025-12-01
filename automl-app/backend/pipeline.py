@@ -88,7 +88,7 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
                 'model': RandomForestClassifier(class_weight='balanced', random_state=42), 
                 'params': rf_params
             },
-             'Decision Tree': { 
+            'Decision Tree': { 
                 'model': DecisionTreeClassifier(class_weight='balanced', random_state=42),
                 'params': {
                     'classifier__max_depth': [5, 10, 20, None],
@@ -133,10 +133,6 @@ def get_configs(task_type, n_rows, scale_pos_weight=1):
 
         return {
             'Linear Regression': {'model': LinearRegression(), 'params': {'classifier__fit_intercept': [True, False]}},
-            'Ridge': {
-                'model': Ridge(), 
-                'params': {'classifier__alpha': [0.01, 0.1, 1.0, 10.0, 100.0]}
-            },
             'Decision Tree': {
                 'model': DecisionTreeRegressor(random_state=42), 
                 'params': {

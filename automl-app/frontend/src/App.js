@@ -7,7 +7,7 @@ import Leaderboard from './Leaderboard';
 
 const MODELS_CONFIG = {
   "Classification": ["Logistic Regression", "Random Forest", "SVM", "KNN", "XGBoost", "Decision Tree"],
-  "Regression": ["Linear Regression", "Ridge", "Lasso", "Random Forest", "XGBoost", "Decision Tree"]
+  "Regression": ["Linear Regression", "Random Forest", "SVM", "XGBoost", "Decision Tree"]
 };
 
 function App() {
