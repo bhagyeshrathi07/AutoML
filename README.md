@@ -266,11 +266,9 @@ Toggle between themes with persistent localStorage saving
 * [ ] **Feature Engineering:** Automated interaction terms and polynomial features.
 * [ ] **Ensemble Builder:** Option to stack the top 3 models into a Voting Classifier.
 * [ ] **Deployment API:** One-click generation of a `predict.py` Flask wrapper.
-**Feature Engineering:** Automated interaction terms and polynomial features
 * [ ] **Ensemble Builder:** One-click stacking of top 3 models into voting classifier/regressor
 * [ ] **Neural Networks:** Add TensorFlow/PyTorch models for deep learning
 * [ ] **Time Series Support:** Add ARIMA, Prophet, and LSTM models
-* [ ] **Deployment API:** One-click generation of production-ready Flask/FastAPI wrapper
 * [ ] **Cloud Integration:** Direct deployment to AWS/GCP/Azure
 * [ ] **Explainability:** SHAP values and feature importance visualization
 * [ ] **Automated Feature Selection:** Remove redundant/irrelevant features
