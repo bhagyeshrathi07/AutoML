@@ -86,6 +86,8 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
               <>
                 <option value="Accuracy">Accuracy</option>
                 <option value="F1 Score">F1 Score</option>
+                <option value="Precision">Precision</option>
+                <option value="Recall">Recall</option>
               </>
             ) : (
               <>
