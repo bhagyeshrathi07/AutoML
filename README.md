@@ -7,6 +7,7 @@ This application allows users to upload any dataset (CSV), automatically detects
 
 It goes beyond simple metrics by providing a **Resource-Aware Leaderboard** (CPU/RAM efficiency), **Interactive Visualizations** (ROC Curves/Confusion Matrices/Scatter Plots), and a unique **Code Generation Engine** that writes clean, reproducible Python scripts for your winning model.
 
+* **GitHub Repository:** [https://github.com/bhagyeshrathi07/AutoML](https://github.com/bhagyeshrathi07/AutoML)
 ---
 
 ## 🌟 Key Features
