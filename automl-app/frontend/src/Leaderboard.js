@@ -112,6 +112,8 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
                 <>
                   <SortableHeader label="Accuracy" metricKey="Accuracy" />
                   <SortableHeader label="F1 Score" metricKey="F1 Score" />
+                  <SortableHeader label="Precision" metricKey="Precision" />
+                  <SortableHeader label="Recall" metricKey="Recall" />
                 </>
               ) : (
                 <>
@@ -149,6 +151,8 @@ const Leaderboard = ({ results, darkMode, taskId }) => {
                     <>
                       <td className={sortKey === 'Accuracy' ? 'text-primary fw-bolder fs-5' : ''}>{(r.Accuracy * 100).toFixed(2)}%</td>
                       <td className={sortKey === 'F1 Score' ? 'text-primary fw-bolder fs-5' : ''}>{(r["F1 Score"] * 100).toFixed(2)}%</td>
+                      <td className={sortKey === 'Precision' ? 'text-primary fw-bolder fs-5' : ''}>{(r["Precision"] * 100).toFixed(2)}%</td>
+                      <td className={sortKey === 'Recall' ? 'text-primary fw-bolder fs-5' : ''}>{(r["Recall"] * 100).toFixed(2)}%</td>
                     </>
                   ) : (
                     <>
